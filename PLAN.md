@@ -9,8 +9,7 @@ https://phytionassetmanagement.com
 - The hydrogen powers cars, trucks, generators, tractors, etc.
 - The emissions this avoids (mainly methane from manure) are sold as carbon credits to manufacturers worldwide
 - Tech side: sensors on vehicles and facilities collect data, and a data pipeline calculates how many credits were generated
-- Industry term for this: MRV (Measurement, Reporting and Verification)
-- Credits get audited, so we need to know which version of the calculation code produced which credits
+- (not sure) Credits get audited, so we need to know which version of the calculation code produced which credits
 
 ---
 
@@ -59,13 +58,13 @@ Out of scope:
 ### Pipeline
 
 1. Code
-   - Bitbucket (decided)
+   - Bitbucket: https://bitbucket.org/andy-test-app/workspace/overview/
 2. Build
    - Jenkins runs it (tool depends on the app's language)
 3. Test
    - Jenkins runs it (tool depends on the app's language)
 4. Release
-   - Jenkins (decided)
+   - Jenkins
 5. Deploy
    - docker
 6. Operate
@@ -76,7 +75,6 @@ Out of scope:
    - no yet
 
 Notes:
-- Chosen because the team already knows Bitbucket and Jenkins
 - Jenkins is a server we have to run ourselves: local Docker for testing, AWS later
 
 ### Plugin design (adapters / profiles)
@@ -88,12 +86,12 @@ Notes:
 
 ### Dashboard Stacks
 - backend tech stacks
-  - Java + Spring Boot (decided: the team and I all know it)
-  - Spring Security for login (needed to know who did what)
+  - Java + Spring Boot
+  - Spring Security for login
   - Spring Data JPA + a database for the action history (every action taken through the
     dashboard: who did it, what it was, and when)
 - frontend tech stacks
-  - React + TypeScript, set up with Vite (decided: I've used them before)
+  - React + TypeScript, set up with Vite
   - Separate app that talks to the Spring Boot API
   - Component library: not picked yet (e.g. MUI or shadcn/ui)
 
