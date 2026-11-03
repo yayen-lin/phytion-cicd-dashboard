@@ -1,0 +1,157 @@
+## Phytion CI/CD Dashboard
+
+It's a single page that connects to all the CI/CD tools. 
+
+### Phytion EcoTracer
+https://phytionassetmanagement.com
+
+- Converts cow manure into hydrogen
+- The hydrogen powers cars, trucks, generators, tractors, etc.
+- The emissions this avoids (mainly methane from manure) are sold as carbon credits to manufacturers worldwide
+- Tech side: sensors on vehicles and facilities collect data, and a data pipeline calculates how many credits were generated
+- Industry term for this: MRV (Measurement, Reporting and Verification)
+- Credits get audited, so we need to know which version of the calculation code produced which credits
+
+---
+
+### Goal
+One page where the Phytion team can see and control their whole CI/CD pipeline
+(code, build, test, release, deploy, operate, monitor, plan) without switching between tools.
+
+- Keeps a history of every action taken through the dashboard (who did what, and when):
+  triggering builds, deploys, rollbacks, and so on
+- Tools connect through adapters, so switching tools (e.g. Bitbucket → GitHub) doesn't
+  require rewriting the dashboard
+- Makes it easy to trace which version of the calculation code produced which carbon credits
+
+### Users
+- For now: just me
+- Users stored in a file for now (no user management yet)
+- Later: proper users and roles (e.g. who can deploy to prod)
+
+### Features
+
+Now:
+- Status of each pipeline stage
+- Buttons that trigger actions (run build, deploy, rollback, ...)
+- Action history: who did what, and when
+- Environments (dev, staging, prod), each with its own deploy config
+- Credentials: API tokens for Bitbucket, Jenkins, AWS kept in environment variables
+  (AWS Secrets Manager later), never in the profile or in git
+- Build logs and test results, viewable in the dashboard
+- Versions and environment overview: built versions available to deploy, and which
+  version is running in each environment
+- Promotion dev → staging → prod, with an "are you sure?" confirmation for prod
+- Rollback to the previous version
+- Live status by polling every few seconds
+
+Later:
+- Notifications (Slack / email) on failed builds and finished deploys
+- Webhooks from Bitbucket and Jenkins instead of polling (needs the dashboard reachable from the internet)
+- Deploy lock: no two deploys to the same environment at once
+- Tool connection status (e.g. Jenkins is down, a token expired)
+- Data pipeline runs (the jobs that calculate credits), to confirm with the team
+
+Out of scope:
+- Defining pipelines in the dashboard. Pipeline steps live in a `Jenkinsfile` in the repo;
+  the dashboard only triggers and shows them
+
+### Pipeline
+
+1. Code
+   - Bitbucket (decided)
+2. Build
+   - Jenkins runs it (tool depends on the app's language)
+3. Test
+   - Jenkins runs it (tool depends on the app's language)
+4. Release
+   - Jenkins (decided)
+5. Deploy
+   - docker
+6. Operate
+    - kubernetes
+7. Monitor
+   - datadog
+8. Plan
+   - no yet
+
+Notes:
+- Chosen because the team already knows Bitbucket and Jenkins
+- Jenkins is a server we have to run ourselves: local Docker for testing, AWS later
+
+### Plugin design (adapters / profiles)
+- Keep it light: one interface per tool type (e.g. "a CI tool can list runs, trigger a run, show logs")
+- Only build the Bitbucket and Jenkins adapters for now
+- A profile is a simple config, e.g. `code: bitbucket`, `ci: jenkins`
+- Adding GitHub / GitHub Actions later = writing new adapters, not rewriting the dashboard
+- Expect to adjust the interfaces when a second tool is added
+
+### Dashboard Stacks
+- backend tech stacks
+  - Java + Spring Boot (decided: the team and I all know it)
+  - Spring Security for login (needed to know who did what)
+  - Spring Data JPA + a database for the action history (every action taken through the
+    dashboard: who did it, what it was, and when)
+- frontend tech stacks
+  - React + TypeScript, set up with Vite (decided: I've used them before)
+  - Separate app that talks to the Spring Boot API
+  - Component library: not picked yet (e.g. MUI or shadcn/ui)
+
+### Open questions
+
+Needed now:
+1. Which pages/buttons do they use every day on their work dashboard?
+2. Do they have a Bitbucket workspace, or do we create one?
+
+Needed later:
+- App language and frameworks (when setting up their repo's pipeline)
+- AWS services, environments (dev/staging/prod), who can deploy to prod (deploy stage)
+- How they version releases (release stage)
+- Monitoring tool (monitor stage)
+- Planning tool, e.g. Jira (plan stage)
+
+### Next steps
+_to discuss_
+
+---
+
+### Notes for Claude (handoff, 2026-11-03)
+
+Working rules (from my personal CLAUDE.md, which lives only on the old computer):
+- Don't write, rewrite, or edit my files unless I explicitly ask. Discuss content in chat first.
+- When suggesting content, say what it's based on (what I told you vs. your own general knowledge or assumptions).
+
+Where we are: Step 1 (Setup) of the proposed build order
+1. Setup: backend + frontend skeletons, Jenkins in Docker, Bitbucket sample app repo
+   with a `Jenkinsfile`, login with a single user from a file, credentials in env vars
+2. See (read-only): adapter interfaces + profile, Bitbucket and Jenkins adapters,
+   dashboard page with polling
+3. Act: run build / retry buttons, action history (pick the database here)
+4. Environments and deploy: env config, versions per env, deploy, promotion with
+   prod confirmation, rollback (Jenkins runs the deploy job; pick artifact storage
+   and deploy target here)
+
+This order hasn't been written into "Next steps" yet; I haven't confirmed it there.
+
+Step 1 progress:
+- [x] 1.1 Docker Desktop installed (old computer). Node.js not installed yet
+- [x] 1.2a Backend skeleton in `backend/`: Spring Boot 4.1.2, Java 21, Gradle (Groovy),
+      package `com.phytion.dashboard`, only the web dependency.
+      `GET /api/status` returns `{"status":"ok"}`. `./gradlew build` passes.
+- [ ] 1.2b Frontend skeleton in `frontend/`: Vite React + TypeScript template, proxy
+      `/api` to the backend on port 8080, show the `/api/status` result on the page
+- [ ] 1.3 Jenkins in Docker, on port **8081** (backend uses 8080). Do this next
+- [ ] 1.4 Sample app repo in the Bitbucket workspace `andy-test-app`
+      (https://bitbucket.org/andy-test-app/workspace/overview/): tiny Spring Boot app
+      with a `Jenkinsfile`
+- [ ] 1.5 Login with a single user from a file (Spring Security)
+
+Gotchas:
+- Spring Initializr (start.spring.io) returns HTTP 500 when `bootVersion` is passed
+  explicitly. Leave it out; the default was 4.1.2
+- Homebrew on the 2017 iMac (macOS 13, Intel) builds Node from source, which takes hours.
+  Use the official installer from nodejs.org instead on older Macs
+
+Open items to ask me about:
+- Delete the empty `main.py` (left over from the Python idea)?
+- Add the build order above to "Next steps"?
