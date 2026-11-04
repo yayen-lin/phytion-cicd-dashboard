@@ -58,7 +58,9 @@ Out of scope:
 ### Pipeline
 
 1. Code
-   - Bitbucket: https://bitbucket.org/andy-test-app/workspace/overview/
+   - Bitbucket: 
+     - test app: https://bitbucket.org/andy-test-app/sample-app/src/main/
+     - phytion: TBD
 2. Build
    - Jenkins runs it (tool depends on the app's language)
 3. Test
@@ -113,43 +115,18 @@ _to discuss_
 
 ---
 
-### Notes for Claude (handoff, 2026-11-03)
+### Worklog
 
-Working rules (from my personal CLAUDE.md, which lives only on the old computer):
-- Don't write, rewrite, or edit my files unless I explicitly ask. Discuss content in chat first.
-- When suggesting content, say what it's based on (what I told you vs. your own general knowledge or assumptions).
-
-Where we are: Step 1 (Setup) of the proposed build order
-1. Setup: backend + frontend skeletons, Jenkins in Docker, Bitbucket sample app repo
-   with a `Jenkinsfile`, login with a single user from a file, credentials in env vars
-2. See (read-only): adapter interfaces + profile, Bitbucket and Jenkins adapters,
-   dashboard page with polling
-3. Act: run build / retry buttons, action history (pick the database here)
-4. Environments and deploy: env config, versions per env, deploy, promotion with
-   prod confirmation, rollback (Jenkins runs the deploy job; pick artifact storage
-   and deploy target here)
-
-This order hasn't been written into "Next steps" yet; I haven't confirmed it there.
-
-Step 1 progress:
+What's Done:
 - [x] 1.1 Docker Desktop installed (old computer). Node.js not installed yet
 - [x] 1.2a Backend skeleton in `backend/`: Spring Boot 4.1.2, Java 21, Gradle (Groovy),
       package `com.phytion.dashboard`, only the web dependency.
       `GET /api/status` returns `{"status":"ok"}`. `./gradlew build` passes.
-- [ ] 1.2b Frontend skeleton in `frontend/`: Vite React + TypeScript template, proxy
+- [x] 1.2b Frontend skeleton in `frontend/`: Vite React + TypeScript template, proxy
       `/api` to the backend on port 8080, show the `/api/status` result on the page
-- [ ] 1.3 Jenkins in Docker, on port **8081** (backend uses 8080). Do this next
-- [ ] 1.4 Sample app repo in the Bitbucket workspace `andy-test-app`
+- [x] 1.3 Jenkins in Docker, on port **8081** (backend uses 8080). Do this next
+- [x] 1.4 Sample app repo in the Bitbucket workspace `andy-test-app`
       (https://bitbucket.org/andy-test-app/workspace/overview/): tiny Spring Boot app
       with a `Jenkinsfile`
-- [ ] 1.5 Login with a single user from a file (Spring Security)
+- [x] 1.5 Login with a single user from a file (Spring Security)
 
-Gotchas:
-- Spring Initializr (start.spring.io) returns HTTP 500 when `bootVersion` is passed
-  explicitly. Leave it out; the default was 4.1.2
-- Homebrew on the 2017 iMac (macOS 13, Intel) builds Node from source, which takes hours.
-  Use the official installer from nodejs.org instead on older Macs
-
-Open items to ask me about:
-- Delete the empty `main.py` (left over from the Python idea)?
-- Add the build order above to "Next steps"?

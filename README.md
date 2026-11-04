@@ -11,5 +11,22 @@ npm run dev # http://localhost:5173
 cd backend
 ./gradlew bootRun # http://localhost:8080
 
+# start the image 
+cd jenkins
+docker compose up -d # http://localhost:8081
+
+
+
+```
+
+Command Cheatsheet
+
+```bash
+
+# docker
+docker compose stop      # stop Jenkins
+docker compose start     # start it again
+docker compose logs -f   # watch Jenkins' output
+docker compose down      # remove the container
 
 ```
