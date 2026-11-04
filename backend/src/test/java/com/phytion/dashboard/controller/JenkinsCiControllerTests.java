@@ -12,7 +12,9 @@ import java.util.List;
 import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.JenkinsCiBuildEntry;
+import com.phytion.dashboard.service.PipelineNotFoundException;
 import com.phytion.dashboard.service.JenkinsCiService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,21 +38,53 @@ class JenkinsCiControllerTests {
     private JenkinsCiService ciService;
 
     @Test
-    void listBuildsNeedsLogin() throws Exception {
-        mvc.perform(get("/api/ci/builds")).andExpect(status().isUnauthorized());
+    void listPipelinesNeedsLogin() throws Exception {
+        mvc.perform(get("/api/ci/pipelines")).andExpect(status().isUnauthorized());
     }
 
     @Test
     @WithMockUser
-    void listBuildsReturnsTheJobAndItsBuilds() throws Exception {
-        when(ciService.job()).thenReturn("sample-app");
-        when(ciService.listBuilds()).thenReturn(List.of(
+    void listPipelinesReturnsIdToolAndJob() throws Exception {
+        when(ciService.pipelines()).thenReturn(List.of(new CiPipeline("jenkins", "sample-app")));
+
+        mvc.perform(get("/api/ci/pipelines"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("jenkins:sample-app"))
+                .andExpect(jsonPath("$[0].tool").value("jenkins"))
+                .andExpect(jsonPath("$[0].job").value("sample-app"));
+    }
+
+    @Test
+    void listBuildsNeedsLogin() throws Exception {
+        mvc.perform(get("/api/ci/builds").param("pipeline", "jenkins:sample-app")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void listBuildsNeedsAPipeline() throws Exception {
+        mvc.perform(get("/api/ci/builds")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser
+    void unknownPipelineGives404WithTheReason() throws Exception {
+        when(ciService.listBuilds("jenkins:other-app")).thenThrow(new PipelineNotFoundException("jenkins:other-app"));
+
+        mvc.perform(get("/api/ci/builds").param("pipeline", "jenkins:other-app"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Unknown pipeline: jenkins:other-app"));
+    }
+
+    @Test
+    @WithMockUser
+    void listBuildsReturnsThePipelineAndItsBuilds() throws Exception {
+        when(ciService.listBuilds("jenkins:sample-app")).thenReturn(List.of(
                 new JenkinsCiBuildEntry("2", JenkinsCiBuildEntry.Status.SUCCESS, "cc99f6b", "main", Instant.parse("2026-11-03T10:00:00Z"),
                         5516L, "http://jenkins/job/sample-app/2/")));
 
-        mvc.perform(get("/api/ci/builds"))
+        mvc.perform(get("/api/ci/builds").param("pipeline", "jenkins:sample-app"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.job").value("sample-app"))
+                .andExpect(jsonPath("$.pipeline").value("jenkins:sample-app"))
                 .andExpect(jsonPath("$.builds[0].id").value("2"))
                 .andExpect(jsonPath("$.builds[0].status").value("SUCCESS"))
                 .andExpect(jsonPath("$.builds[0].commit").value("cc99f6b"))
@@ -61,30 +95,30 @@ class JenkinsCiControllerTests {
     @Test
     @WithMockUser
     void ciToolFailureGives502WithTheReason() throws Exception {
-        when(ciService.listBuilds()).thenThrow(new CiToolException("Jenkins not reachable"));
+        when(ciService.listBuilds("jenkins:sample-app")).thenThrow(new CiToolException("Jenkins not reachable"));
 
-        mvc.perform(get("/api/ci/builds"))
+        mvc.perform(get("/api/ci/builds").param("pipeline", "jenkins:sample-app"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error").value("Jenkins not reachable"));
     }
 
     @Test
     void triggerBuildNeedsLogin() throws Exception {
-        mvc.perform(post("/api/ci/builds").with(csrf())).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/ci/builds").param("pipeline", "jenkins:sample-app").with(csrf())).andExpect(status().isUnauthorized());
     }
 
     @Test
     @WithMockUser
     void triggerBuildNeedsCsrfToken() throws Exception {
-        mvc.perform(post("/api/ci/builds")).andExpect(status().isForbidden());
+        mvc.perform(post("/api/ci/builds").param("pipeline", "jenkins:sample-app")).andExpect(status().isForbidden());
     }
 
     @Test
     @WithMockUser(username = "andy")
     void triggerBuildPassesTheLoggedInUserAndReturnsTheBuildId() throws Exception {
-        when(ciService.triggerBuild("andy")).thenReturn(Optional.of("4"));
+        when(ciService.triggerBuild("jenkins:sample-app", "andy")).thenReturn(Optional.of("4"));
 
-        mvc.perform(post("/api/ci/builds").with(csrf()))
+        mvc.perform(post("/api/ci/builds").param("pipeline", "jenkins:sample-app").with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.buildId").value("4"));
     }
@@ -92,9 +126,9 @@ class JenkinsCiControllerTests {
     @Test
     @WithMockUser(username = "andy")
     void triggerBuildStillQueuedReturnsNullBuildId() throws Exception {
-        when(ciService.triggerBuild("andy")).thenReturn(Optional.empty());
+        when(ciService.triggerBuild("jenkins:sample-app", "andy")).thenReturn(Optional.empty());
 
-        mvc.perform(post("/api/ci/builds").with(csrf()))
+        mvc.perform(post("/api/ci/builds").param("pipeline", "jenkins:sample-app").with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.buildId").isEmpty());
     }

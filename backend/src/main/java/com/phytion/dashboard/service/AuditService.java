@@ -40,4 +40,9 @@ public class AuditService {
     public List<AuditEntry> getRecentEntries() {
         return entries.findByOrderByIdDesc(Limit.of(maxEntries));
     }
+
+    /** Get most recent entries about one target (e.g. the pipeline "jenkins:sample-app"), newest first. */
+    public List<AuditEntry> getRecentEntries(String target) {
+        return entries.findByTargetOrderByIdDesc(target, Limit.of(maxEntries));
+    }
 }

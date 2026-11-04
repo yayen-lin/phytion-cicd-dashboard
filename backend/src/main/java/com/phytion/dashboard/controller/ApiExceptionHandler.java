@@ -3,6 +3,7 @@ package com.phytion.dashboard.controller;
 import java.util.Map;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.service.PipelineNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -23,5 +24,11 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, String>> ciToolFailed(CiToolException e) {
         log.warn("CI tool request failed", e);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));
+    }
+
+    /** The request names a pipeline that isn't configured: 404 with the reason. */
+    @ExceptionHandler(PipelineNotFoundException.class)
+    public ResponseEntity<Map<String, String>> pipelineNotFound(PipelineNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
     }
 }

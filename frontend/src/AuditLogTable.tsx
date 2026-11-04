@@ -1,61 +1,99 @@
 import {useEffect, useState} from 'react'
-import {getAuditLog, type AuditEntry, type CiBuild} from './api'
+import {Badge} from '@/components/ui/badge'
+import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
+import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
+import {Skeleton} from '@/components/ui/skeleton'
+import {getAuditLog, getBuilds, type AuditEntry, type CiBuild} from './api'
+import StatusBadge from './StatusBadge'
 
 type Props = {
-  /** The CI builds, to show the status of the build each entry started */
-  builds: CiBuild[]
+  /** Only actions on this pipeline, e.g. "jenkins:sample-app" */
+  pipeline: string
 }
 
-/** Every action taken through the dashboard, newest first: who did what, and when. */
-function AuditLogTable({builds}: Props) {
+/** "TRIGGER_BUILD" -> "Trigger build" */
+function formatActionType(actionType: string): string {
+  const words = actionType.toLowerCase().replaceAll('_', ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/** The actions taken on a pipeline through the dashboard, newest first: who did what, and when. */
+function AuditLogTable({pipeline}: Props) {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null)
   const [error, setError] = useState('')
+  // The CI builds, to show the status of the build each entry started
+  const [builds, setBuilds] = useState<CiBuild[]>([])
 
   useEffect(() => {
-    getAuditLog()
+    getAuditLog(pipeline)
       .then(setEntries)
       .catch(() => setError('Could not load the audit log'))
-  }, [])
-
-  if (error) return <p role="alert">{error}</p>
-  if (!entries) return <p>Loading history...</p>
+    // Only for the build status column: if the CI tool is down, that column shows "-"
+    getBuilds(pipeline)
+      .then((data) => setBuilds(data.builds))
+      .catch(() => setBuilds([]))
+  }, [pipeline])
 
   return (
-    <section>
-      <h2>History</h2>
-      {entries.length === 0 ? (
-        <p>No actions yet.</p>
-      ) : (
-        <table>
-          <thead>
-          <tr>
-            <th>When</th>
-            <th>Who</th>
-            <th>What</th>
-            <th>Target</th>
-            <th>Build</th>
-            <th>Build status</th>
-            <th>Action result</th>
-            <th>Details</th>
-          </tr>
-          </thead>
-          <tbody>
-          {entries.map((entry) => (
-            <tr key={entry.id}>
-              <td>{new Date(entry.createdAt).toLocaleString()}</td>
-              <td>{entry.username}</td>
-              <td>{entry.actionType}</td>
-              <td>{entry.target}</td>
-              <td>{entry.buildId ? `#${entry.buildId}` : '-'}</td>
-              <td>{builds.find((build) => build.id === entry.buildId)?.status ?? '-'}</td>
-              <td>{entry.actionResult}</td>
-              <td>{entry.details ?? ''}</td>
-            </tr>
-          ))}
-          </tbody>
-        </table>
-      )}
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">History</CardTitle>
+        <CardDescription>Actions taken on this pipeline through the dashboard: who did what, and when</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <Alert variant="destructive">
+            <AlertTitle>History unavailable</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : !entries ? (
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full"/>)}
+          </div>
+        ) : entries.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">No actions yet.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>When</TableHead>
+                <TableHead>Who</TableHead>
+                <TableHead>What</TableHead>
+                <TableHead>Target</TableHead>
+                <TableHead>Build</TableHead>
+                <TableHead>Build status</TableHead>
+                <TableHead>Action result</TableHead>
+                <TableHead>Details</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {entries.map((entry) => {
+                const build = builds.find((b) => b.id === entry.buildId)
+                return (
+                  <TableRow key={entry.id}>
+                    <TableCell className="text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</TableCell>
+                    <TableCell className="font-medium">{entry.username}</TableCell>
+                    <TableCell>{formatActionType(entry.actionType)}</TableCell>
+                    <TableCell className="font-mono text-xs">{entry.target}</TableCell>
+                    <TableCell>{entry.buildId ? `#${entry.buildId}` : '-'}</TableCell>
+                    <TableCell>{build ? <StatusBadge status={build.status}/> : '-'}</TableCell>
+                    <TableCell>
+                      <Badge variant={entry.actionResult === 'SUCCESS' ? 'outline' : 'destructive'}>
+                        {entry.actionResult === 'SUCCESS' ? 'Done' : 'Failed'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate text-muted-foreground" title={entry.details ?? undefined}>
+                      {entry.details ?? ''}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

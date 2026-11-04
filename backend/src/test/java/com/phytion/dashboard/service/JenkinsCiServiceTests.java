@@ -6,11 +6,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.config.CiProperties;
 import com.phytion.dashboard.model.AuditEntry;
+import com.phytion.dashboard.model.CiPipeline;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -27,16 +30,42 @@ class JenkinsCiServiceTests {
     void setUp() {
         ci = mock(JenkinsAdapter.class);
         audit = mock(AuditService.class);
-        ciService = new JenkinsCiService(ci, audit, "sample-app");
+        ciService = new JenkinsCiService(ci, audit, new CiProperties(List.of(new CiPipeline("jenkins", "sample-app"))));
+    }
+
+    @Test
+    void listBuildsAsksTheToolForThePipelinesJob() {
+        when(ci.listBuilds("sample-app")).thenReturn(List.of());
+
+        assertThat(ciService.listBuilds("jenkins:sample-app")).isEmpty();
+
+        verify(ci).listBuilds("sample-app");
+    }
+
+    @Test
+    void unknownPipelineIsRejected() {
+        assertThatThrownBy(() -> ciService.listBuilds("jenkins:other-app"))
+                .isInstanceOf(PipelineNotFoundException.class);
+        assertThatThrownBy(() -> ciService.triggerBuild("jenkins:other-app", "andy"))
+                .isInstanceOf(PipelineNotFoundException.class);
+    }
+
+    @Test
+    void pipelineOnAToolWithoutAdapterFailsAtStartup() {
+        CiProperties properties = new CiProperties(List.of(new CiPipeline("github-actions", "some-app")));
+
+        assertThatThrownBy(() -> new JenkinsCiService(ci, audit, properties))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("github-actions");
     }
 
     @Test
     void triggerBuildRecordsWhoStartedWhichBuild() {
         when(ci.triggerBuild("sample-app")).thenReturn(Optional.of("4"));
 
-        assertThat(ciService.triggerBuild("andy")).contains("4");
+        assertThat(ciService.triggerBuild("jenkins:sample-app", "andy")).contains("4");
 
-        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app", AuditEntry.ActionResult.SUCCESS,
+        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app", AuditEntry.ActionResult.SUCCESS,
                 "4", null);
     }
 
@@ -44,9 +73,9 @@ class JenkinsCiServiceTests {
     void triggerBuildStillQueuedIsRecordedWithoutBuildId() {
         when(ci.triggerBuild("sample-app")).thenReturn(Optional.empty());
 
-        assertThat(ciService.triggerBuild("andy")).isEmpty();
+        assertThat(ciService.triggerBuild("jenkins:sample-app", "andy")).isEmpty();
 
-        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app", AuditEntry.ActionResult.SUCCESS,
+        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app", AuditEntry.ActionResult.SUCCESS,
                 null, "Queued, but the CI tool hadn't started it yet");
     }
 
@@ -54,9 +83,9 @@ class JenkinsCiServiceTests {
     void failedTriggerIsRecordedAndRethrown() {
         when(ci.triggerBuild("sample-app")).thenThrow(new CiToolException("Jenkins not reachable"));
 
-        assertThatThrownBy(() -> ciService.triggerBuild("andy")).isInstanceOf(CiToolException.class);
+        assertThatThrownBy(() -> ciService.triggerBuild("jenkins:sample-app", "andy")).isInstanceOf(CiToolException.class);
 
-        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app", AuditEntry.ActionResult.FAILED,
+        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app", AuditEntry.ActionResult.FAILED,
                 null, "Jenkins not reachable");
     }
 }

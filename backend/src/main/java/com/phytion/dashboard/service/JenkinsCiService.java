@@ -3,54 +3,81 @@ package com.phytion.dashboard.service;
 import java.util.List;
 import java.util.Optional;
 
-import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
+import com.phytion.dashboard.config.CiProperties;
 import com.phytion.dashboard.model.AuditEntry;
+import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.JenkinsCiBuildEntry;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * CI builds of the configured job: listing them, and starting new ones (recorded in the audit log).
- * Works with whichever CI tool the CiAdapter connects to.
+ * CI builds of the configured pipelines: listing them, and starting new ones (recorded in the audit log).
  */
 @Service
-@RequiredArgsConstructor
 public class JenkinsCiService {
+
+    private static final String JENKINS = "jenkins";
 
     private final JenkinsAdapter ci;
     private final AuditService audit;
+    private final List<CiPipeline> pipelines;
 
-    @Value("${dashboard.ci.job}")
-    private final String job;
-
-    public String job() {
-        return job;
+    public JenkinsCiService(JenkinsAdapter ci, AuditService audit, CiProperties properties) {
+        // Jenkins is the only CI tool with an adapter so far: fail at startup rather than on the first request
+        properties.pipelines().stream()
+                .filter(pipeline -> !JENKINS.equals(pipeline.tool()))
+                .findFirst()
+                .ifPresent(pipeline -> {
+                    throw new IllegalStateException("No adapter for CI tool '" + pipeline.tool()
+                            + "' (pipeline " + pipeline.id() + "); only 'jenkins' is supported");
+                });
+        this.ci = ci;
+        this.audit = audit;
+        this.pipelines = properties.pipelines();
     }
 
-    public List<JenkinsCiBuildEntry> listBuilds() {
-        return ci.listBuilds(job);
+    /** The configured pipelines, in config order. */
+    public List<CiPipeline> pipelines() {
+        return pipelines;
     }
 
     /**
-     * Starts a build of the job and records it in the audit log.
-     *
-     * @param username who started it
-     * @return the new build's id, or empty when the CI tool hasn't started the build yet
-     * @throws CiToolException when the CI tool can't be reached or refuses
+     * @param pipelineId e.g. "jenkins:sample-app"
+     * @throws PipelineNotFoundException when no configured pipeline has that id
      */
-    public Optional<String> triggerBuild(String username) {
+    public List<JenkinsCiBuildEntry> listBuilds(String pipelineId) {
+        return ci.listBuilds(pipeline(pipelineId).job());
+    }
+
+    /**
+     * Starts a build of the pipeline's job and records it in the audit log.
+     *
+     * @param pipelineId e.g. "jenkins:sample-app"
+     * @param username   who started it
+     * @return the new build's id, or empty when the CI tool hasn't started the build yet
+     * @throws PipelineNotFoundException when no configured pipeline has that id
+     * @throws CiToolException           when the CI tool can't be reached or refuses
+     */
+    public Optional<String> triggerBuild(String pipelineId, String username) {
+        CiPipeline pipeline = pipeline(pipelineId);
         Optional<String> buildId;
         try {
-            buildId = ci.triggerBuild(job);
+            buildId = ci.triggerBuild(pipeline.job());
         } catch (CiToolException e) {
-            audit.add(username, AuditEntry.ActionType.TRIGGER_BUILD, job, AuditEntry.ActionResult.FAILED, null,
-                    e.getMessage());
+            audit.add(username, AuditEntry.ActionType.TRIGGER_BUILD, pipeline.id(), AuditEntry.ActionResult.FAILED,
+                    null, e.getMessage());
             throw e;
         }
-        audit.add(username, AuditEntry.ActionType.TRIGGER_BUILD, job, AuditEntry.ActionResult.SUCCESS,
+        audit.add(username, AuditEntry.ActionType.TRIGGER_BUILD, pipeline.id(), AuditEntry.ActionResult.SUCCESS,
                 buildId.orElse(null), buildId.isPresent() ? null : "Queued, but the CI tool hadn't started it yet");
         return buildId;
+    }
+
+    private CiPipeline pipeline(String pipelineId) {
+        return pipelines.stream()
+                .filter(pipeline -> pipeline.id().equals(pipelineId))
+                .findFirst()
+                .orElseThrow(() -> new PipelineNotFoundException(pipelineId));
     }
 }

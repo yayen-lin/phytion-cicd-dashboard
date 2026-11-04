@@ -12,4 +12,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface AuditEntryRepository extends JpaRepository<AuditEntry, Long> {
 
     List<AuditEntry> findByOrderByIdDesc(Limit limit);
+
+    List<AuditEntry> findByTargetOrderByIdDesc(String target, Limit limit);
 }

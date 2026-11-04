@@ -43,9 +43,9 @@ class AuditControllerTests {
     @Test
     @WithMockUser
     void auditLogIsNewestFirst() throws Exception {
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app",
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
                 Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null));
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app",
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
                 Instant.parse("2026-11-03T11:00:00Z"), AuditEntry.ActionResult.FAILED, null, "Jenkins not reachable"));
 
         mvc.perform(get("/api/audit"))
@@ -56,7 +56,21 @@ class AuditControllerTests {
                 .andExpect(jsonPath("$[0].details").value("Jenkins not reachable"))
                 .andExpect(jsonPath("$[1].username").value("andy"))
                 .andExpect(jsonPath("$[1].actionType").value("TRIGGER_BUILD"))
-                .andExpect(jsonPath("$[1].target").value("sample-app"))
+                .andExpect(jsonPath("$[1].target").value("jenkins:sample-app"))
                 .andExpect(jsonPath("$[1].buildId").value("3"));
+    }
+
+    @Test
+    @WithMockUser
+    void auditLogCanBeFilteredByTarget() throws Exception {
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
+                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null));
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:other-app",
+                Instant.parse("2026-11-03T11:00:00Z"), AuditEntry.ActionResult.SUCCESS, "7", null));
+
+        mvc.perform(get("/api/audit").param("target", "jenkins:sample-app"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].buildId").value("3"));
     }
 }

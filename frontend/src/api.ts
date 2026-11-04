@@ -39,6 +39,20 @@ export async function logout(): Promise<void> {
   await post('/api/logout')
 }
 
+/** A CI job the dashboard shows, and the tool that runs it */
+export type CiPipeline = {
+  id: string // e.g. "jenkins:sample-app"
+  tool: string // e.g. "jenkins"
+  job: string // e.g. "sample-app"
+}
+
+/** Returns the configured CI pipelines, in the order the backend lists them. */
+export async function getPipelines(): Promise<CiPipeline[]> {
+  const res = await fetch('/api/ci/pipelines')
+  if (!res.ok) throw new Error(`GET /api/ci/pipelines failed: ${res.status}`)
+  return res.json()
+}
+
 export type CiBuildStatus = 'RUNNING' | 'SUCCESS' | 'FAILED' | 'UNSTABLE' | 'ABORTED' | 'UNKNOWN'
 
 /** One build of a CI job */
@@ -53,23 +67,23 @@ export type CiBuild = {
 }
 
 export type CiBuilds = {
-  job: string
+  pipeline: string
   builds: CiBuild[]
 }
 
-/** Returns the recent builds of the configured CI job, newest first. */
-export async function getBuilds(): Promise<CiBuilds> {
-  const res = await fetch('/api/ci/builds')
+/** Returns the recent builds of a pipeline, newest first. */
+export async function getBuilds(pipeline: string): Promise<CiBuilds> {
+  const res = await fetch(`/api/ci/builds?${new URLSearchParams({pipeline})}`)
   if (!res.ok) throw new Error(`GET /api/ci/builds failed: ${res.status}`)
   return res.json()
 }
 
 /**
- * Starts a build of the configured CI job. Returns the new build's id, or null when the CI tool
+ * Starts a build of a pipeline. Returns the new build's id, or null when the CI tool
  * hasn't started it yet (still queued). Can take up to ~30 seconds.
  */
-export async function triggerBuild(): Promise<string | null> {
-  const res = await post('/api/ci/builds')
+export async function triggerBuild(pipeline: string): Promise<string | null> {
+  const res = await post(`/api/ci/builds?${new URLSearchParams({pipeline})}`)
   if (!res.ok) throw new Error(`POST /api/ci/builds failed: ${res.status}`)
   const data: { buildId: string | null } = await res.json()
   return data.buildId
@@ -87,9 +101,9 @@ export type AuditEntry = {
   details: string | null
 }
 
-/** Returns the most recent audit log entries, newest first. */
-export async function getAuditLog(): Promise<AuditEntry[]> {
-  const res = await fetch('/api/audit')
+/** Returns the most recent audit log entries about a target (e.g. a pipeline id), newest first. */
+export async function getAuditLog(target: string): Promise<AuditEntry[]> {
+  const res = await fetch(`/api/audit?${new URLSearchParams({target})}`)
   if (!res.ok) throw new Error(`GET /api/audit failed: ${res.status}`)
   return res.json()
 }
