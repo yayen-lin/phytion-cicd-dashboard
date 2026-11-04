@@ -130,3 +130,17 @@ What's Done:
       with a `Jenkinsfile`
 - [x] 1.5 Login with a single user from a file (Spring Security)
 
+What's Next:
+- [x] 1.6 CI adapter interface + read-only Jenkins adapter: `CiAdapter` with `listRuns(job)`,
+      `getRun(job, id)`; `JenkinsAdapter` calls the Jenkins REST API with URL/user/token from
+      environment variables; `GET /api/ci/runs`; frontend lists the sample-app's builds
+      (number, status, commit, time)
+- [x] 1.7 "Run build" button + action history: `triggerRun(job)` on the adapter; Spring Data JPA
+      + file-based H2; `Action` entity (who, what, target, when, result); `POST /api/ci/runs`
+      triggers the build and records the action; history table in the UI
+- [ ] 1.8 Build logs and test results: `getLog(job, id)` on the adapter, log viewer page,
+      test results from Jenkins' JUnit report API
+- [ ] 1.9 Polling: frontend refetches runs every few seconds while a build is running
+- [ ] 1.10 Bitbucket adapter + profiles: `CodeAdapter` (branches, recent commits),
+      `BitbucketAdapter`, profile config (`code: bitbucket`, `ci: jenkins`) selects the adapters
+

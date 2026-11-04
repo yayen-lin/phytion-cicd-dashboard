@@ -1,0 +1,178 @@
+package com.phytion.dashboard.adapter.ci.jenkins;
+
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Supplier;
+
+import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.model.JenkinsCiBuildEntry;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+
+/**
+ * CI adapter for Jenkins
+ */
+@Component
+public class JenkinsAdapterImpl implements JenkinsAdapter {
+
+    private final RestClient jenkins;
+    private final JenkinsProperties properties;
+
+    @Autowired
+    public JenkinsAdapterImpl(JenkinsProperties properties) {
+        this(RestClient.builder()
+                        .baseUrl(properties.url())
+                        .defaultHeaders(headers -> headers.setBasicAuth(properties.user(), properties.token()))
+                        .build(),
+                properties);
+    }
+
+    // For tests, which pass a RestClient wired to a fake Jenkins
+    JenkinsAdapterImpl(RestClient jenkins, JenkinsProperties properties) {
+        this.jenkins = jenkins;
+        this.properties = properties;
+    }
+
+    @Override
+    public List<JenkinsCiBuildEntry> listBuilds(String job) {
+        return call(() -> {
+            // e.g. builds[number,result,...]{0,20}: the newest maxBuilds builds
+            String tree = "builds[" + JenkinsJson.BUILD_FIELDS + "]{0," + properties.maxBuilds() + "}";
+            JenkinsJson.Job response = jenkins.get()
+                    .uri("/job/{job}/api/json?tree={tree}", job, tree)
+                    .retrieve()
+                    .body(JenkinsJson.Job.class);
+            if (response == null || response.builds() == null) {
+                return List.of();
+            }
+            return response.builds().stream().map(JenkinsAdapterImpl::toCiBuild).toList();
+        });
+    }
+
+    @Override
+    public Optional<JenkinsCiBuildEntry> getBuild(String job, String buildId) {
+        return call(() -> {
+            try {
+                JenkinsJson.Build build = jenkins.get()
+                        .uri("/job/{job}/{id}/api/json?tree={tree}", job, buildId, JenkinsJson.BUILD_FIELDS)
+                        .retrieve()
+                        .body(JenkinsJson.Build.class);
+                return Optional.ofNullable(build).map(JenkinsAdapterImpl::toCiBuild);
+            } catch (HttpClientErrorException.NotFound e) {
+                return Optional.empty();
+            }
+        });
+    }
+
+    /**
+     * Jenkins doesn't start a build right away: it puts it in a queue and answers with the queue item's URL.
+     * The build (and its number) exists once a worker picks the item up, so we ask the queue item until then.
+     */
+    @Override
+    public Optional<String> triggerBuild(String job) {
+        return call(() -> {
+            // delay=0sec skips Jenkins' default 5 second "quiet period" before a queued build may start
+            URI queueItem = jenkins.post()
+                    .uri("/job/{job}/build?delay=0sec", job)
+                    .retrieve()
+                    .toBodilessEntity()
+                    .getHeaders()
+                    .getLocation();
+            if (queueItem == null) {
+                throw new CiToolException("Jenkins did not say where it queued the build");
+            }
+            // Use only the path: the Location host is Jenkins' own idea of its URL, which may differ from ours
+            String queueItemPath = queueItem.getPath().endsWith("/") ? queueItem.getPath() : queueItem.getPath() + "/";
+
+            Instant giveUpAt = Instant.now().plus(properties.queueTimeout());
+            while (true) {
+                JenkinsJson.QueueItem item = jenkins.get()
+                        .uri(queueItemPath + "api/json")
+                        .retrieve()
+                        .body(JenkinsJson.QueueItem.class);
+                if (item != null && item.cancelled()) {
+                    throw new CiToolException("Jenkins cancelled the queued build");
+                }
+                if (item != null && item.executable() != null) {
+                    return Optional.of(String.valueOf(item.executable().number()));
+                }
+                if (Instant.now().isAfter(giveUpAt)) {
+                    return Optional.empty();
+                }
+                sleep(properties.queuePollInterval());
+            }
+        });
+    }
+
+    /**
+     * Runs a request to Jenkins, turning HTTP client errors into a CiToolException with a short message.
+     */
+    private static <T> T call(Supplier<T> request) {
+        try {
+            return request.get();
+        } catch (HttpStatusCodeException e) {
+            // Keep just the status: the body is often a whole HTML error page
+            throw new CiToolException("Jenkins answered " + e.getStatusCode().value() + " " + e.getStatusText(), e);
+        } catch (ResourceAccessException e) {
+            throw new CiToolException("Jenkins not reachable", e);
+        } catch (RestClientException e) {
+            throw new CiToolException("Jenkins request failed", e);
+        }
+    }
+
+    private static void sleep(Duration duration) {
+        try {
+            Thread.sleep(duration);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CiToolException("Interrupted while waiting for Jenkins to start the build", e);
+        }
+    }
+
+    private static JenkinsCiBuildEntry toCiBuild(JenkinsJson.Build build) {
+        JenkinsJson.Revision revision = build.actions() == null ? null : build.actions().stream()
+                .map(JenkinsJson.Action::lastBuiltRevision)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        String commit = revision == null ? null : revision.sha1();
+        String branch = revision == null || revision.branch() == null || revision.branch().isEmpty()
+                ? null
+                // "refs/remotes/origin/main" -> "main"
+                : revision.branch().getFirst().name().replaceFirst("^refs/remotes/[^/]+/", "");
+
+        return new JenkinsCiBuildEntry(
+                String.valueOf(build.number()),
+                toStatus(build),
+                commit,
+                branch,
+                Instant.ofEpochMilli(build.timestamp()),
+                build.inProgress() ? null : build.duration(),
+                build.url());
+    }
+
+    private static JenkinsCiBuildEntry.Status toStatus(JenkinsJson.Build build) {
+        if (build.inProgress()) {
+            return JenkinsCiBuildEntry.Status.RUNNING;
+        }
+        if (build.result() == null) {
+            return JenkinsCiBuildEntry.Status.UNKNOWN;
+        }
+        return switch (build.result()) {
+            case "SUCCESS" -> JenkinsCiBuildEntry.Status.SUCCESS;
+            case "FAILURE" -> JenkinsCiBuildEntry.Status.FAILED;
+            case "UNSTABLE" -> JenkinsCiBuildEntry.Status.UNSTABLE;
+            case "ABORTED" -> JenkinsCiBuildEntry.Status.ABORTED;
+            default -> JenkinsCiBuildEntry.Status.UNKNOWN;
+        };
+    }
+}

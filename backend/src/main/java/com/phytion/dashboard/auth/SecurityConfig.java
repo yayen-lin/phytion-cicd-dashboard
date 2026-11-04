@@ -1,4 +1,4 @@
-package com.phytion.dashboard;
+package com.phytion.dashboard.auth;
 
 import java.io.IOException;
 import java.util.Properties;

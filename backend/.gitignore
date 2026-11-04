@@ -38,3 +38,9 @@ out/
 
 ### Dashboard users (password hashes) ###
 users.properties
+
+### Local secrets (API tokens) ###
+.env
+
+### Local database (action history) ###
+data/

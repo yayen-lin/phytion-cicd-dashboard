@@ -1,12 +1,18 @@
 import {useEffect, useState} from 'react'
-import {getMe, logout, type User} from './api'
+import {getBuilds, getMe, logout, type CiBuilds, type User} from './api'
 import LoginPage from './LoginPage'
+import BuildsTable from './BuildsTable'
+import AuditLogTable from './AuditLogTable'
 
 function App() {
   // undefined = still checking, null = not logged in
   const [user, setUser] = useState<User | null | undefined>(undefined)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('loading...')
+  const [auditLogVersion, setAuditLogVersion] = useState(0)
+  // Loaded here because both tables use them: the audit log shows each build's status
+  const [builds, setBuilds] = useState<CiBuilds | null>(null)
+  const [buildsError, setBuildsError] = useState('')
 
   function loadUser() {
     getMe()
@@ -25,6 +31,19 @@ function App() {
       .then((res) => res.json())
       .then((data: { status: string }) => setStatus(data.status))
       .catch(() => setStatus('backend not reachable'))
+  }, [user])
+
+  function loadBuilds() {
+    getBuilds()
+      .then((data) => {
+        setBuilds(data)
+        setBuildsError('')
+      })
+      .catch(() => setBuildsError('Could not load builds from the CI tool'))
+  }
+
+  useEffect(() => {
+    if (user) loadBuilds()
   }, [user])
 
   async function handleLogout() {
@@ -56,6 +75,12 @@ function App() {
         </p>
       </header>
       <p>Backend status: {status}</p>
+      <BuildsTable builds={builds} error={buildsError} onTriggered={() => {
+        loadBuilds()
+        setAuditLogVersion((v) => v + 1)
+      }}/>
+      {/* A new key makes React recreate the table, which loads the audit log again */}
+      <AuditLogTable key={auditLogVersion} builds={builds?.builds ?? []}/>
     </main>
   )
 }

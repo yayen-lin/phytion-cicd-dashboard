@@ -1,4 +1,4 @@
-package com.phytion.dashboard;
+package com.phytion.dashboard.auth;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
