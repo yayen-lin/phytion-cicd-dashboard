@@ -1,7 +1,7 @@
 import {Ban, CircleCheck, CircleHelp, CircleX, Loader2, TriangleAlert} from 'lucide-react'
 import {Badge} from '@/components/ui/badge'
 import {cn} from '@/lib/utils'
-import type {CiBuildStatus} from './api'
+import type {CiBuildStatus} from '@/api/ci'
 
 const styles: Record<CiBuildStatus, { className: string, icon: typeof CircleCheck, label: string }> = {
   RUNNING: {className: 'bg-sky-500/15 text-sky-700 dark:text-sky-300', icon: Loader2, label: 'Running'},

@@ -138,14 +138,17 @@ What's Next:
 - [x] 1.7 "Run build" button + action history: `triggerRun(job)` on the adapter; Spring Data JPA
       + file-based H2; `Action` entity (who, what, target, when, result); `POST /api/ci/runs`
       triggers the build and records the action; history table in the UI
-- [ ] 1.8a Frontend look: shadcn/ui (Tailwind) as the component library; app shell (sidebar with
+- [x] 1.8a Frontend look: shadcn/ui (Tailwind) as the component library; app shell (sidebar with
       the CI/CD stages, only Build works so far; top bar with theme and user menus; routing);
       restyle the login page, builds table (status badges) and history table.
       Build page: pipeline selector (`jenkins:sample-app`, listed in `dashboard.ci.pipelines` in
       the backend config, served by `GET /api/ci/pipelines`), tabs Builds (`/build/builds`) and
       History (`/build/history`, the audit log filtered to that pipeline)
-- [ ] 1.8 Build logs and test results: `getLog(job, id)` on the adapter, log viewer page,
-      test results from Jenkins' JUnit report API
+- [x] 1.8 Build details: clicking a build row opens a modal (status, full commit, branch, start
+      time, duration, who started it) with links to the build and its log in Jenkins. One request:
+      `GET /api/ci/builds/{id}?pipeline=` gets the build from Jenkins; "started by" is the dashboard
+      user from the audit log, else the Jenkins user who started it. Later build actions (rebuild, abort, deploy) go as buttons in this modal.
+      Log viewer and test results in the dashboard: skipped for now, Jenkins shows them
 - [ ] 1.9 Polling: frontend refetches runs every few seconds while a build is running
 - [ ] 1.10 Bitbucket adapter + profiles: `CodeAdapter` (branches, recent commits),
       `BitbucketAdapter`, profile config (`code: bitbucket`, `ci: jenkins`) selects the adapters

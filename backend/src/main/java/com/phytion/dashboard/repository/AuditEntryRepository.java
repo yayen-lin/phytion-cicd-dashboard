@@ -1,6 +1,7 @@
 package com.phytion.dashboard.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.phytion.dashboard.model.AuditEntry;
 import org.springframework.data.domain.Limit;
@@ -14,4 +15,8 @@ public interface AuditEntryRepository extends JpaRepository<AuditEntry, Long> {
     List<AuditEntry> findByOrderByIdDesc(Limit limit);
 
     List<AuditEntry> findByTargetOrderByIdDesc(String target, Limit limit);
+
+    Optional<AuditEntry> findFirstByTargetAndActionTypeAndBuildIdOrderByIdDesc(String target,
+                                                                                AuditEntry.ActionType actionType,
+                                                                                String buildId);
 }

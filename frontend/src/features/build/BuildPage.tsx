@@ -5,9 +5,9 @@ import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Skeleton} from '@/components/ui/skeleton'
 import {Tabs, TabsList, TabsTrigger} from '@/components/ui/tabs'
-import {getPipelines, type CiPipeline} from './api'
+import {getPipelines, type CiPipeline} from '@/api/ci'
 import BuildsTable from './BuildsTable'
-import AuditLogTable from './AuditLogTable'
+import HistoryTable from './HistoryTable'
 
 const tabs = ['builds', 'history'] as const
 type Tab = typeof tabs[number]
@@ -92,7 +92,7 @@ function BuildPage() {
           <div className="pt-2">
             {tab === 'builds'
               ? <BuildsTable key={pipeline.id} pipeline={pipeline.id}/>
-              : <AuditLogTable key={pipeline.id} pipeline={pipeline.id}/>}
+              : <HistoryTable key={pipeline.id} pipeline={pipeline.id}/>}
           </div>
         </Tabs>
       )}

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.JenkinsCiBuildEntry;
 import com.phytion.dashboard.service.PipelineNotFoundException;
@@ -100,6 +101,30 @@ class JenkinsCiControllerTests {
         mvc.perform(get("/api/ci/builds").param("pipeline", "jenkins:sample-app"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error").value("Jenkins not reachable"));
+    }
+
+    @Test
+    @WithMockUser
+    void getBuildReturnsTheBuildAndWhoStartedIt() throws Exception {
+        when(ciService.getBuild("jenkins:sample-app", "2")).thenReturn(Optional.of(new CiBuildDetails(
+                new JenkinsCiBuildEntry("2", JenkinsCiBuildEntry.Status.SUCCESS, "cc99f6b", "main",
+                        Instant.parse("2026-11-03T10:00:00Z"), 5516L, "http://jenkins/job/sample-app/2/"),
+                "andy")));
+
+        mvc.perform(get("/api/ci/builds/2").param("pipeline", "jenkins:sample-app"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.build.id").value("2"))
+                .andExpect(jsonPath("$.build.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.startedBy").value("andy"));
+    }
+
+    @Test
+    @WithMockUser
+    void getBuildThatDoesNotExistGives404() throws Exception {
+        when(ciService.getBuild("jenkins:sample-app", "99")).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/ci/builds/99").param("pipeline", "jenkins:sample-app"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

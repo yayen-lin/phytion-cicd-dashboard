@@ -1,23 +1,19 @@
 import {useCallback, useEffect, useState} from 'react'
 import {toast} from 'sonner'
-import {ExternalLink, GitBranch, Loader2, Play} from 'lucide-react'
+import {GitBranch, Loader2, Play} from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
-import {getBuilds, triggerBuild, type CiBuilds} from './api'
+import {getBuilds, triggerBuild, type CiBuilds} from '@/api/ci'
 import StatusBadge from './StatusBadge'
+import BuildDetailsDialog from './BuildDetailsDialog'
+import {formatDuration} from '@/lib/format'
 
 type Props = {
   /** e.g. "jenkins:sample-app" */
   pipeline: string
-}
-
-function formatDuration(millis: number | null): string {
-  if (millis === null) return 'running...'
-  const seconds = Math.round(millis / 1000)
-  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
 }
 
 /** The builds of a pipeline, newest first, with a button to start a new one. */
@@ -26,6 +22,8 @@ function BuildsTable({pipeline}: Props) {
   const [data, setData] = useState<CiBuilds | null>(null)
   const [error, setError] = useState('')
   const [triggering, setTriggering] = useState(false)
+  // The id of the build shown in the details modal, or null when it is closed
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const loadBuilds = useCallback(() => {
     getBuilds(pipeline)
@@ -90,14 +88,20 @@ function BuildsTable({pipeline}: Props) {
             </TableHeader>
             <TableBody>
               {data.builds.map((build) => (
-                <TableRow key={build.id}>
-                  <TableCell>
-                    <a href={build.url} target="_blank" rel="noreferrer"
-                       className="inline-flex items-center gap-1 font-medium hover:underline">
-                      #{build.id}
-                      <ExternalLink className="size-3 text-muted-foreground"/>
-                    </a>
-                  </TableCell>
+                <TableRow
+                  key={build.id}
+                  className="cursor-pointer"
+                  tabIndex={0}
+                  aria-label={`Build #${build.id} details`}
+                  onClick={() => setSelectedId(build.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setSelectedId(build.id)
+                    }
+                  }}
+                >
+                  <TableCell className="font-medium">#{build.id}</TableCell>
                   <TableCell><StatusBadge status={build.status}/></TableCell>
                   <TableCell>
                     <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs" title={build.commit ?? undefined}>
@@ -121,6 +125,7 @@ function BuildsTable({pipeline}: Props) {
           </Table>
         )}
       </CardContent>
+      <BuildDetailsDialog pipeline={pipeline} buildId={selectedId} onClose={() => setSelectedId(null)}/>
     </Card>
   )
 }

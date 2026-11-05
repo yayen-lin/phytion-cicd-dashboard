@@ -4,7 +4,8 @@ import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/compo
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
-import {getAuditLog, getBuilds, type AuditEntry, type CiBuild} from './api'
+import {getAuditLog, type AuditEntry} from '@/api/audit'
+import {getBuilds, type CiBuild} from '@/api/ci'
 import StatusBadge from './StatusBadge'
 
 type Props = {
@@ -19,7 +20,7 @@ function formatActionType(actionType: string): string {
 }
 
 /** The actions taken on a pipeline through the dashboard, newest first: who did what, and when. */
-function AuditLogTable({pipeline}: Props) {
+function HistoryTable({pipeline}: Props) {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null)
   const [error, setError] = useState('')
   // The CI builds, to show the status of the build each entry started
@@ -97,4 +98,4 @@ function AuditLogTable({pipeline}: Props) {
   )
 }
 
-export default AuditLogTable
+export default HistoryTable

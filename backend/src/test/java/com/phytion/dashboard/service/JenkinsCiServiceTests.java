@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +14,8 @@ import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.config.CiProperties;
 import com.phytion.dashboard.model.AuditEntry;
+import com.phytion.dashboard.model.CiBuildDetails;
+import com.phytion.dashboard.model.JenkinsCiBuildEntry;
 import com.phytion.dashboard.model.CiPipeline;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +43,34 @@ class JenkinsCiServiceTests {
         assertThat(ciService.listBuilds("jenkins:sample-app")).isEmpty();
 
         verify(ci).listBuilds("sample-app");
+    }
+
+    @Test
+    void getBuildStartedThroughTheDashboardShowsTheDashboardUser() {
+        when(ci.getBuild("sample-app", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "dashboard-bot")));
+        when(audit.findBuildStarter("jenkins:sample-app", "4")).thenReturn(Optional.of("andy"));
+
+        assertThat(ciService.getBuild("jenkins:sample-app", "4")).map(CiBuildDetails::startedBy).contains("andy");
+    }
+
+    @Test
+    void getBuildStartedOutsideTheDashboardShowsTheCiToolUser() {
+        when(ci.getBuild("sample-app", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "Andy Lin")));
+        when(audit.findBuildStarter("jenkins:sample-app", "4")).thenReturn(Optional.empty());
+
+        assertThat(ciService.getBuild("jenkins:sample-app", "4")).map(CiBuildDetails::startedBy).contains("Andy Lin");
+    }
+
+    @Test
+    void getBuildThatDoesNotExistIsEmpty() {
+        when(ci.getBuild("sample-app", "99")).thenReturn(Optional.empty());
+
+        assertThat(ciService.getBuild("jenkins:sample-app", "99")).isEmpty();
+    }
+
+    private static JenkinsCiBuildEntry build(String id) {
+        return new JenkinsCiBuildEntry(id, JenkinsCiBuildEntry.Status.SUCCESS, null, null, Instant.EPOCH, 1000L,
+                "http://jenkins/job/sample-app/" + id + "/");
     }
 
     @Test

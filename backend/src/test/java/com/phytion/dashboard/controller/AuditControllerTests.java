@@ -1,13 +1,17 @@
 package com.phytion.dashboard.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
 
 import com.phytion.dashboard.model.AuditEntry;
 import com.phytion.dashboard.repository.AuditEntryRepository;
+import com.phytion.dashboard.service.AuditService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +33,9 @@ class AuditControllerTests {
 
     @Autowired
     private AuditEntryRepository entries;
+
+    @Autowired
+    private AuditService auditService;
 
     @BeforeEach
     void clearAuditLog() {
@@ -58,6 +65,16 @@ class AuditControllerTests {
                 .andExpect(jsonPath("$[1].actionType").value("TRIGGER_BUILD"))
                 .andExpect(jsonPath("$[1].target").value("jenkins:sample-app"))
                 .andExpect(jsonPath("$[1].buildId").value("3"));
+    }
+
+    @Test
+    void findBuildStarterFindsTheDashboardUserWhoStartedTheBuild() {
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
+                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null));
+
+        assertThat(auditService.findBuildStarter("jenkins:sample-app", "3")).contains("andy");
+        assertThat(auditService.findBuildStarter("jenkins:sample-app", "4")).isEmpty();
+        assertThat(auditService.findBuildStarter("jenkins:other-app", "3")).isEmpty();
     }
 
     @Test

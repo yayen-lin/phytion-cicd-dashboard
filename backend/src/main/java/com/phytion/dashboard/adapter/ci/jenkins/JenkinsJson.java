@@ -22,6 +22,11 @@ final class JenkinsJson {
     static final String BUILD_FIELDS =
             "number,result,inProgress,timestamp,duration,url,actions[lastBuiltRevision[SHA1,branch[name]]]";
 
+    // BUILD_FIELDS plus what started the build, for the single-build view
+    static final String BUILD_DETAIL_FIELDS =
+            "number,result,inProgress,timestamp,duration,url,"
+                    + "actions[lastBuiltRevision[SHA1,branch[name]],causes[userId,userName]]";
+
     /** GET /job/{job}/{number}/api/json, and each entry of Job.builds */
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Build(
@@ -34,9 +39,14 @@ final class JenkinsJson {
             List<Action> actions) {
     }
 
-    /** Most actions come back empty; the git plugin's holds the built commit */
+    /** Most actions come back empty; the git plugin's holds the built commit, the CauseAction what started the build */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record Action(Revision lastBuiltRevision) {
+    record Action(Revision lastBuiltRevision, List<Cause> causes) {
+    }
+
+    /** Why a build started. userId/userName are set only when a Jenkins user started it (not for a push or a timer). */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record Cause(String userId, String userName) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

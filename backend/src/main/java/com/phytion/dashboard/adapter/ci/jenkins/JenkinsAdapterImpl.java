@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.JenkinsCiBuildEntry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -59,14 +60,14 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
     }
 
     @Override
-    public Optional<JenkinsCiBuildEntry> getBuild(String job, String buildId) {
+    public Optional<CiBuildDetails> getBuild(String job, String buildId) {
         return call(() -> {
             try {
                 JenkinsJson.Build build = jenkins.get()
-                        .uri("/job/{job}/{id}/api/json?tree={tree}", job, buildId, JenkinsJson.BUILD_FIELDS)
+                        .uri("/job/{job}/{id}/api/json?tree={tree}", job, buildId, JenkinsJson.BUILD_DETAIL_FIELDS)
                         .retrieve()
                         .body(JenkinsJson.Build.class);
-                return Optional.ofNullable(build).map(JenkinsAdapterImpl::toCiBuild);
+                return Optional.ofNullable(build).map(b -> new CiBuildDetails(toCiBuild(b), startedBy(b)));
             } catch (HttpClientErrorException.NotFound e) {
                 return Optional.empty();
             }
@@ -158,6 +159,20 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                 Instant.ofEpochMilli(build.timestamp()),
                 build.inProgress() ? null : build.duration(),
                 build.url());
+    }
+
+    /** The Jenkins user who started the build, or null when no user did (e.g. a push or a timer) */
+    private static String startedBy(JenkinsJson.Build build) {
+        if (build.actions() == null) {
+            return null;
+        }
+        return build.actions().stream()
+                .filter(action -> action.causes() != null)
+                .flatMap(action -> action.causes().stream())
+                .map(cause -> cause.userName() != null ? cause.userName() : cause.userId())
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private static JenkinsCiBuildEntry.Status toStatus(JenkinsJson.Build build) {

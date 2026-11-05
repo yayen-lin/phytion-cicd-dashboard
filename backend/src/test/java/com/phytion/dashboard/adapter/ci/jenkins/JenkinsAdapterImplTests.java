@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.JenkinsCiBuildEntry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,8 +93,36 @@ class JenkinsAdapterImplTests {
                         """, MediaType.APPLICATION_JSON));
 
         assertThat(adapter.getBuild("sample-app", "2"))
-                .map(JenkinsCiBuildEntry::status)
+                .map(details -> details.build().status())
                 .contains(JenkinsCiBuildEntry.Status.ABORTED);
+    }
+
+    @Test
+    void getBuildReadsTheJenkinsUserWhoStartedIt() {
+        jenkins.expect(requestTo(startsWith("http://jenkins/job/sample-app/5/api/json")))
+                .andRespond(withSuccess("""
+                        {"number": 5, "result": "SUCCESS", "inProgress": false, "timestamp": 1793745018832,
+                         "duration": 1000, "url": "http://jenkins/job/sample-app/5/", "actions": [
+                           {"_class": "hudson.model.CauseAction", "causes": [
+                             {"_class": "hudson.model.Cause$UserIdCause", "userId": "andy", "userName": "Andy Lin"}]},
+                           {}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.getBuild("sample-app", "5")).map(CiBuildDetails::startedBy).contains("Andy Lin");
+    }
+
+    @Test
+    void getBuildStartedByAPushHasNoUser() {
+        jenkins.expect(requestTo(startsWith("http://jenkins/job/sample-app/6/api/json")))
+                .andRespond(withSuccess("""
+                        {"number": 6, "result": "SUCCESS", "inProgress": false, "timestamp": 1793745018832,
+                         "duration": 1000, "url": "http://jenkins/job/sample-app/6/", "actions": [
+                           {"_class": "hudson.model.CauseAction", "causes": [
+                             {"_class": "hudson.triggers.SCMTrigger$SCMTriggerCause"}]}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.getBuild("sample-app", "6")).isPresent().get()
+                .extracting(CiBuildDetails::startedBy).isNull();
     }
 
     @Test

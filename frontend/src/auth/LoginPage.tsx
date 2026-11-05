@@ -1,11 +1,11 @@
-import {useState, type FormEvent} from 'react'
+import {useState, type SubmitEvent} from 'react'
 import {Loader2, Workflow} from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
 import {Input} from '@/components/ui/input'
 import {Label} from '@/components/ui/label'
 import {Alert, AlertDescription} from '@/components/ui/alert'
-import {login} from './api'
+import {login} from '@/api/auth'
 
 type Props = {
   /** An error from outside the form (e.g. backend not reachable), or empty */
@@ -19,7 +19,7 @@ function LoginPage({error: outsideError, onLogin}: Props) {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  async function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitting(true)
     setError('')

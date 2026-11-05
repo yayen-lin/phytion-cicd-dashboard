@@ -2,6 +2,7 @@ package com.phytion.dashboard.service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import com.phytion.dashboard.model.AuditEntry;
 import com.phytion.dashboard.repository.AuditEntryRepository;
@@ -39,6 +40,12 @@ public class AuditService {
     /** Get most recent entries, newest first. */
     public List<AuditEntry> getRecentEntries() {
         return entries.findByOrderByIdDesc(Limit.of(maxEntries));
+    }
+
+    /** Who started a build of a target (e.g. the pipeline "jenkins:sample-app") through the dashboard, if anyone. */
+    public Optional<String> findBuildStarter(String target, String buildId) {
+        return entries.findFirstByTargetAndActionTypeAndBuildIdOrderByIdDesc(target, AuditEntry.ActionType.TRIGGER_BUILD,
+                buildId).map(AuditEntry::getUsername);
     }
 
     /** Get most recent entries about one target (e.g. the pipeline "jenkins:sample-app"), newest first. */

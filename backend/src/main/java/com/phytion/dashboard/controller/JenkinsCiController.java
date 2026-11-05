@@ -2,12 +2,15 @@ package com.phytion.dashboard.controller;
 
 import java.util.List;
 
+import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.JenkinsCiBuildEntry;
 import com.phytion.dashboard.service.JenkinsCiService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,6 +32,12 @@ public class JenkinsCiController {
     @GetMapping("/api/ci/builds")
     public BuildsResponse listBuilds(@RequestParam String pipeline) {
         return new BuildsResponse(pipeline, ciService.listBuilds(pipeline));
+    }
+
+    /** One build with who started it; 404 when the CI tool has no such build */
+    @GetMapping("/api/ci/builds/{buildId}")
+    public ResponseEntity<CiBuildDetails> getBuild(@PathVariable String buildId, @RequestParam String pipeline) {
+        return ResponseEntity.of(ciService.getBuild(pipeline, buildId));
     }
 
     @PostMapping("/api/ci/builds")

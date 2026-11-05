@@ -7,6 +7,7 @@ import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
 import com.phytion.dashboard.config.CiProperties;
 import com.phytion.dashboard.model.AuditEntry;
+import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.JenkinsCiBuildEntry;
 import org.springframework.stereotype.Service;
@@ -48,6 +49,21 @@ public class JenkinsCiService {
      */
     public List<JenkinsCiBuildEntry> listBuilds(String pipelineId) {
         return ci.listBuilds(pipeline(pipelineId).job());
+    }
+
+    /**
+     * One build of a pipeline. "Started by" is the dashboard user when the build was started through the dashboard
+     * (the CI tool only knows the dashboard's own API user then), otherwise the CI tool's user.
+     *
+     * @param pipelineId e.g. "jenkins:sample-app"
+     * @return the build, or empty when the CI tool has no such build
+     * @throws PipelineNotFoundException when no configured pipeline has that id
+     */
+    public Optional<CiBuildDetails> getBuild(String pipelineId, String buildId) {
+        CiPipeline pipeline = pipeline(pipelineId);
+        return ci.getBuild(pipeline.job(), buildId).map(details -> audit.findBuildStarter(pipeline.id(), buildId)
+                .map(username -> new CiBuildDetails(details.build(), username))
+                .orElse(details));
     }
 
     /**
