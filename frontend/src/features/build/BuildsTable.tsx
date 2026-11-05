@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useState} from 'react'
 import {toast} from 'sonner'
-import {GitBranch, Loader2, Play} from 'lucide-react'
+import {GitBranch, Loader2, Play, RefreshCw} from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
@@ -22,11 +22,12 @@ function BuildsTable({pipeline}: Props) {
   const [data, setData] = useState<CiBuilds | null>(null)
   const [error, setError] = useState('')
   const [triggering, setTriggering] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   // The id of the build shown in the details modal, or null when it is closed
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const loadBuilds = useCallback(() => {
-    getBuilds(pipeline)
+    return getBuilds(pipeline)
       .then((builds) => {
         setData(builds)
         setError('')
@@ -34,7 +35,16 @@ function BuildsTable({pipeline}: Props) {
       .catch(() => setError('Could not load builds from the CI tool'))
   }, [pipeline])
 
-  useEffect(loadBuilds, [loadBuilds])
+  useEffect(() => {
+    loadBuilds()
+  }, [loadBuilds])
+
+  // Keeps the current rows on screen while reloading
+  async function handleRefresh() {
+    setRefreshing(true)
+    await loadBuilds()
+    setRefreshing(false)
+  }
 
   async function handleRunBuild() {
     setTriggering(true)
@@ -55,7 +65,11 @@ function BuildsTable({pipeline}: Props) {
       <CardHeader>
         <CardTitle className="text-lg">Builds</CardTitle>
         <CardDescription>Recent builds, newest first</CardDescription>
-        <CardAction>
+        <CardAction className="flex gap-2">
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
+            Refresh
+          </Button>
           <Button onClick={handleRunBuild} disabled={triggering || !data}>
             {triggering ? <Loader2 className="animate-spin"/> : <Play/>}
             {triggering ? 'Starting...' : 'Run build'}

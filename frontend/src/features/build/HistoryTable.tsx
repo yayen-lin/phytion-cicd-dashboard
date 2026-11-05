@@ -1,6 +1,8 @@
-import {useEffect, useState} from 'react'
+import {useCallback, useEffect, useState} from 'react'
+import {RefreshCw} from 'lucide-react'
 import {Badge} from '@/components/ui/badge'
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Button} from '@/components/ui/button'
+import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
@@ -25,22 +27,45 @@ function HistoryTable({pipeline}: Props) {
   const [error, setError] = useState('')
   // The CI builds, to show the status of the build each entry started
   const [builds, setBuilds] = useState<CiBuild[]>([])
+  const [refreshing, setRefreshing] = useState(false)
+
+  const loadHistory = useCallback(() => {
+    return Promise.all([
+      getAuditLog(pipeline)
+        .then((log) => {
+          setEntries(log)
+          setError('')
+        })
+        .catch(() => setError('Could not load the audit log')),
+      // Only for the build status column: if the CI tool is down, that column shows "-"
+      getBuilds(pipeline)
+        .then((data) => setBuilds(data.builds))
+        .catch(() => setBuilds([])),
+    ])
+  }, [pipeline])
 
   useEffect(() => {
-    getAuditLog(pipeline)
-      .then(setEntries)
-      .catch(() => setError('Could not load the audit log'))
-    // Only for the build status column: if the CI tool is down, that column shows "-"
-    getBuilds(pipeline)
-      .then((data) => setBuilds(data.builds))
-      .catch(() => setBuilds([]))
-  }, [pipeline])
+    loadHistory()
+  }, [loadHistory])
+
+  // Keeps the current rows on screen while reloading
+  async function handleRefresh() {
+    setRefreshing(true)
+    await loadHistory()
+    setRefreshing(false)
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">History</CardTitle>
         <CardDescription>Actions taken on this pipeline through the dashboard: who did what, and when</CardDescription>
+        <CardAction>
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
+            Refresh
+          </Button>
+        </CardAction>
       </CardHeader>
       <CardContent>
         {error ? (

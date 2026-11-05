@@ -23,6 +23,10 @@ Command Cheatsheet
 
 ```bash
 
+# frontend
+npx tsc -b     # type check
+npm run lint   # lint check
+
 # docker
 docker compose stop      # stop Jenkins
 docker compose start     # start it again

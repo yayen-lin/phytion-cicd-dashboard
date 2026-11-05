@@ -149,7 +149,7 @@ What's Next:
       `GET /api/ci/builds/{id}?pipeline=` gets the build from Jenkins; "started by" is the dashboard
       user from the audit log, else the Jenkins user who started it. Later build actions (rebuild, abort, deploy) go as buttons in this modal.
       Log viewer and test results in the dashboard: skipped for now, Jenkins shows them
-- [ ] 1.9 Polling: frontend refetches runs every few seconds while a build is running
+- [x] 1.9 Refresh button for the table
 - [ ] 1.10 Bitbucket adapter + profiles: `CodeAdapter` (branches, recent commits),
       `BitbucketAdapter`, profile config (`code: bitbucket`, `ci: jenkins`) selects the adapters
 
