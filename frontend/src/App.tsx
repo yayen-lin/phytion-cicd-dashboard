@@ -1,6 +1,7 @@
 import {Navigate, Route, Routes} from 'react-router'
 import AppLayout from '@/layout/AppLayout'
 import BuildPage from '@/features/build/BuildPage'
+import CodePage from '@/features/code/CodePage'
 
 /** The pages. Only rendered once logged in (see AuthProvider). */
 function App() {
@@ -9,6 +10,8 @@ function App() {
       <Route element={<AppLayout/>}>
         {/* Landing page after login: blank for now, just the sidebar and top bar */}
         <Route index element={null}/>
+        <Route path="code" element={<Navigate to="/code/branches" replace/>}/>
+        <Route path="code/:tab" element={<CodePage/>}/>
         <Route path="build" element={<Navigate to="/build/builds" replace/>}/>
         {/* Each tab loads its own data each time it is opened */}
         <Route path="build/:tab" element={<BuildPage/>}/>

@@ -17,7 +17,7 @@ import java.util.List;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.model.CiBuildDetails;
-import com.phytion.dashboard.model.JenkinsCiBuildEntry;
+import com.phytion.dashboard.model.CiBuild;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -64,14 +64,14 @@ class JenkinsAdapterImplTests {
                         ]}
                         """, MediaType.APPLICATION_JSON));
 
-        List<JenkinsCiBuildEntry> builds = adapter.listBuilds("sample-app");
+        List<CiBuild> builds = adapter.listBuilds("sample-app");
 
         assertThat(builds).containsExactly(
-                new JenkinsCiBuildEntry("3", JenkinsCiBuildEntry.Status.RUNNING, null, null, Instant.ofEpochMilli(1793745100000L), null,
+                new CiBuild("3", CiBuild.Status.RUNNING, null, null, Instant.ofEpochMilli(1793745100000L), null,
                         "http://jenkins/job/sample-app/3/"),
-                new JenkinsCiBuildEntry("2", JenkinsCiBuildEntry.Status.SUCCESS, "cc99f6b852396cb487275a77c5f008e6077bdd0b", "main",
+                new CiBuild("2", CiBuild.Status.SUCCESS, "cc99f6b852396cb487275a77c5f008e6077bdd0b", "main",
                         Instant.ofEpochMilli(1793745018832L), 5516L, "http://jenkins/job/sample-app/2/"),
-                new JenkinsCiBuildEntry("1", JenkinsCiBuildEntry.Status.FAILED, null, null, Instant.ofEpochMilli(1793744856847L), 43745L,
+                new CiBuild("1", CiBuild.Status.FAILED, null, null, Instant.ofEpochMilli(1793744856847L), 43745L,
                         "http://jenkins/job/sample-app/1/"));
         jenkins.verify();
     }
@@ -94,7 +94,7 @@ class JenkinsAdapterImplTests {
 
         assertThat(adapter.getBuild("sample-app", "2"))
                 .map(details -> details.build().status())
-                .contains(JenkinsCiBuildEntry.Status.ABORTED);
+                .contains(CiBuild.Status.ABORTED);
     }
 
     @Test

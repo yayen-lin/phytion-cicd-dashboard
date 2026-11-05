@@ -7,5 +7,5 @@ package com.phytion.dashboard.model;
  * @param startedBy who started the build: the dashboard user when it was started through the dashboard, otherwise
  *                  the CI tool's user; null when no user started it (e.g. a push or a timer)
  */
-public record CiBuildDetails(JenkinsCiBuildEntry build, String startedBy) {
+public record CiBuildDetails(CiBuild build, String startedBy) {
 }

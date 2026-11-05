@@ -1,3 +1,8 @@
+/** A commit message's summary: "Fix login\n\nLonger explanation" -> "Fix login" */
+export function firstLine(message: string): string {
+  return message.split('\n')[0]
+}
+
 /** How long a build took, e.g. "42s" or "3m 5s"; "running..." while it has no duration yet. */
 export function formatDuration(millis: number | null): string {
   if (millis === null) return 'running...'

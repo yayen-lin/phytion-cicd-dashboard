@@ -16,7 +16,7 @@ import {
 
 /** The CI/CD stages, in pipeline order. Stages without a path aren't built yet. */
 const stages = [
-  {label: 'Code', icon: Code},
+  {label: 'Code', icon: Code, path: '/code'},
   {label: 'Build', icon: Hammer, path: '/build'},
   {label: 'Test', icon: FlaskConical},
   {label: 'Release', icon: Tag},

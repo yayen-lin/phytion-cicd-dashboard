@@ -5,7 +5,7 @@ import java.time.Instant;
 /**
  * One build of a CI job
  *
- * @param id             jenkins build number
+ * @param id             the build's id in the CI tool, e.g. the build number in Jenkins
  * @param status         where the build is at
  * @param commit         the git commit the build built, or null
  * @param branch         the branch the build built, or null
@@ -13,7 +13,7 @@ import java.time.Instant;
  * @param durationMillis how long the build took, or null while it is still running
  * @param url            the build's page in the CI tool
  */
-public record JenkinsCiBuildEntry(
+public record CiBuild(
         String id,
         Status status,
         String commit,

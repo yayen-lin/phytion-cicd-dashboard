@@ -14,7 +14,7 @@ import java.util.Optional;
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiPipeline;
-import com.phytion.dashboard.model.JenkinsCiBuildEntry;
+import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.service.PipelineNotFoundException;
 import com.phytion.dashboard.service.JenkinsCiService;
 import org.junit.jupiter.api.Test;
@@ -80,7 +80,7 @@ class JenkinsCiControllerTests {
     @WithMockUser
     void listBuildsReturnsThePipelineAndItsBuilds() throws Exception {
         when(ciService.listBuilds("jenkins:sample-app")).thenReturn(List.of(
-                new JenkinsCiBuildEntry("2", JenkinsCiBuildEntry.Status.SUCCESS, "cc99f6b", "main", Instant.parse("2026-11-03T10:00:00Z"),
+                new CiBuild("2", CiBuild.Status.SUCCESS, "cc99f6b", "main", Instant.parse("2026-11-03T10:00:00Z"),
                         5516L, "http://jenkins/job/sample-app/2/")));
 
         mvc.perform(get("/api/ci/builds").param("pipeline", "jenkins:sample-app"))
@@ -107,7 +107,7 @@ class JenkinsCiControllerTests {
     @WithMockUser
     void getBuildReturnsTheBuildAndWhoStartedIt() throws Exception {
         when(ciService.getBuild("jenkins:sample-app", "2")).thenReturn(Optional.of(new CiBuildDetails(
-                new JenkinsCiBuildEntry("2", JenkinsCiBuildEntry.Status.SUCCESS, "cc99f6b", "main",
+                new CiBuild("2", CiBuild.Status.SUCCESS, "cc99f6b", "main",
                         Instant.parse("2026-11-03T10:00:00Z"), 5516L, "http://jenkins/job/sample-app/2/"),
                 "andy")));
 

@@ -10,7 +10,7 @@ import java.util.function.Supplier;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.model.CiBuildDetails;
-import com.phytion.dashboard.model.JenkinsCiBuildEntry;
+import com.phytion.dashboard.model.CiBuild;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -44,7 +44,7 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
     }
 
     @Override
-    public List<JenkinsCiBuildEntry> listBuilds(String job) {
+    public List<CiBuild> listBuilds(String job) {
         return call(() -> {
             // e.g. builds[number,result,...]{0,20}: the newest maxBuilds builds
             String tree = "builds[" + JenkinsJson.BUILD_FIELDS + "]{0," + properties.maxBuilds() + "}";
@@ -139,7 +139,7 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
         }
     }
 
-    private static JenkinsCiBuildEntry toCiBuild(JenkinsJson.Build build) {
+    private static CiBuild toCiBuild(JenkinsJson.Build build) {
         JenkinsJson.Revision revision = build.actions() == null ? null : build.actions().stream()
                 .map(JenkinsJson.Action::lastBuiltRevision)
                 .filter(Objects::nonNull)
@@ -151,7 +151,7 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                 // "refs/remotes/origin/main" -> "main"
                 : revision.branch().getFirst().name().replaceFirst("^refs/remotes/[^/]+/", "");
 
-        return new JenkinsCiBuildEntry(
+        return new CiBuild(
                 String.valueOf(build.number()),
                 toStatus(build),
                 commit,
@@ -175,19 +175,19 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                 .orElse(null);
     }
 
-    private static JenkinsCiBuildEntry.Status toStatus(JenkinsJson.Build build) {
+    private static CiBuild.Status toStatus(JenkinsJson.Build build) {
         if (build.inProgress()) {
-            return JenkinsCiBuildEntry.Status.RUNNING;
+            return CiBuild.Status.RUNNING;
         }
         if (build.result() == null) {
-            return JenkinsCiBuildEntry.Status.UNKNOWN;
+            return CiBuild.Status.UNKNOWN;
         }
         return switch (build.result()) {
-            case "SUCCESS" -> JenkinsCiBuildEntry.Status.SUCCESS;
-            case "FAILURE" -> JenkinsCiBuildEntry.Status.FAILED;
-            case "UNSTABLE" -> JenkinsCiBuildEntry.Status.UNSTABLE;
-            case "ABORTED" -> JenkinsCiBuildEntry.Status.ABORTED;
-            default -> JenkinsCiBuildEntry.Status.UNKNOWN;
+            case "SUCCESS" -> CiBuild.Status.SUCCESS;
+            case "FAILURE" -> CiBuild.Status.FAILED;
+            case "UNSTABLE" -> CiBuild.Status.UNSTABLE;
+            case "ABORTED" -> CiBuild.Status.ABORTED;
+            default -> CiBuild.Status.UNKNOWN;
         };
     }
 }

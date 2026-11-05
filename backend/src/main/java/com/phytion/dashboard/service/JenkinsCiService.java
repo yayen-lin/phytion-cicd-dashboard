@@ -9,7 +9,7 @@ import com.phytion.dashboard.config.CiProperties;
 import com.phytion.dashboard.model.AuditEntry;
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiPipeline;
-import com.phytion.dashboard.model.JenkinsCiBuildEntry;
+import com.phytion.dashboard.model.CiBuild;
 import org.springframework.stereotype.Service;
 
 /**
@@ -47,7 +47,7 @@ public class JenkinsCiService {
      * @param pipelineId e.g. "jenkins:sample-app"
      * @throws PipelineNotFoundException when no configured pipeline has that id
      */
-    public List<JenkinsCiBuildEntry> listBuilds(String pipelineId) {
+    public List<CiBuild> listBuilds(String pipelineId) {
         return ci.listBuilds(pipeline(pipelineId).job());
     }
 

@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiPipeline;
-import com.phytion.dashboard.model.JenkinsCiBuildEntry;
+import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.service.JenkinsCiService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -52,7 +52,7 @@ public class JenkinsCiController {
         }
     }
 
-    public record BuildsResponse(String pipeline, List<JenkinsCiBuildEntry> builds) {
+    public record BuildsResponse(String pipeline, List<CiBuild> builds) {
     }
 
     /** @param buildId the started build's id, or null when the CI tool hasn't started it yet */

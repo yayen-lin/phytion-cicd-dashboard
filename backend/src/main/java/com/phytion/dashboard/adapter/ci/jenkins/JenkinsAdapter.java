@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.phytion.dashboard.model.CiBuildDetails;
-import com.phytion.dashboard.model.JenkinsCiBuildEntry;
+import com.phytion.dashboard.model.CiBuild;
 
 /**
  * jenkins ci implementation
@@ -12,7 +12,7 @@ import com.phytion.dashboard.model.JenkinsCiBuildEntry;
 public interface JenkinsAdapter {
 
     /** most recent builds of a job, newest first. */
-    List<JenkinsCiBuildEntry> listBuilds(String job);
+    List<CiBuild> listBuilds(String job);
 
     /** One build of a job with who started it in Jenkins (null if no user did), or empty if it doesn't exist. */
     Optional<CiBuildDetails> getBuild(String job, String buildId);

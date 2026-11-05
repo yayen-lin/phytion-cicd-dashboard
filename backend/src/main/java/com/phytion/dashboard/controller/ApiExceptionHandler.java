@@ -3,7 +3,9 @@ package com.phytion.dashboard.controller;
 import java.util.Map;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.service.PipelineNotFoundException;
+import com.phytion.dashboard.service.RepoNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -19,16 +21,23 @@ public class ApiExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
-    /** An external tool is down, a token is wrong, ...: answer 502 (bad gateway) instead of a generic 500. */
+    // 502 when an external tool is down
     @ExceptionHandler(CiToolException.class)
     public ResponseEntity<Map<String, String>> ciToolFailed(CiToolException e) {
         log.warn("CI tool request failed", e);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));
     }
 
-    /** The request names a pipeline that isn't configured: 404 with the reason. */
-    @ExceptionHandler(PipelineNotFoundException.class)
-    public ResponseEntity<Map<String, String>> pipelineNotFound(PipelineNotFoundException e) {
+    // 502 when an external tool is down
+    @ExceptionHandler(CodeToolException.class)
+    public ResponseEntity<Map<String, String>> codeToolFailed(CodeToolException e) {
+        log.warn("Code tool request failed", e);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));
+    }
+
+    /// 404 when requesting an external that isn't configured
+    @ExceptionHandler({PipelineNotFoundException.class, RepoNotFoundException.class})
+    public ResponseEntity<Map<String, String>> notConfigured(RuntimeException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
     }
 }

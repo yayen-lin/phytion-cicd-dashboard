@@ -15,7 +15,7 @@ import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.config.CiProperties;
 import com.phytion.dashboard.model.AuditEntry;
 import com.phytion.dashboard.model.CiBuildDetails;
-import com.phytion.dashboard.model.JenkinsCiBuildEntry;
+import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.CiPipeline;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,8 +68,8 @@ class JenkinsCiServiceTests {
         assertThat(ciService.getBuild("jenkins:sample-app", "99")).isEmpty();
     }
 
-    private static JenkinsCiBuildEntry build(String id) {
-        return new JenkinsCiBuildEntry(id, JenkinsCiBuildEntry.Status.SUCCESS, null, null, Instant.EPOCH, 1000L,
+    private static CiBuild build(String id) {
+        return new CiBuild(id, CiBuild.Status.SUCCESS, null, null, Instant.EPOCH, 1000L,
                 "http://jenkins/job/sample-app/" + id + "/");
     }
 
