@@ -70,7 +70,7 @@ class JenkinsCiServiceTests {
 
     private static CiBuild build(String id) {
         return new CiBuild(id, CiBuild.Status.SUCCESS, null, null, Instant.EPOCH, 1000L,
-                "http://jenkins/job/sample-app/" + id + "/");
+                "http://jenkins/job/sample-app/" + id + "/", null);
     }
 
     @Test

@@ -12,6 +12,8 @@ import java.time.Instant;
  * @param startedAt      when the build started
  * @param durationMillis how long the build took, or null while it is still running
  * @param url            the build's page in the CI tool
+ * @param tests          how many tests passed, failed and were skipped, or null when the build has no test results
+ *                       (still running, or it stopped before the tests)
  */
 public record CiBuild(
         String id,
@@ -20,7 +22,8 @@ public record CiBuild(
         String branch,
         Instant startedAt,
         Long durationMillis,
-        String url) {
+        String url,
+        CiTestCounts tests) {
 
     public enum Status {
         RUNNING,

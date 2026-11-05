@@ -9,6 +9,7 @@ import com.phytion.dashboard.config.CiProperties;
 import com.phytion.dashboard.model.AuditEntry;
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiPipeline;
+import com.phytion.dashboard.model.CiTestReport;
 import com.phytion.dashboard.model.CiBuild;
 import org.springframework.stereotype.Service;
 
@@ -64,6 +65,15 @@ public class JenkinsCiService {
         return ci.getBuild(pipeline.job(), buildId).map(details -> audit.findBuildStarter(pipeline.id(), buildId)
                 .map(username -> new CiBuildDetails(details.build(), username))
                 .orElse(details));
+    }
+
+    /**
+     * @param pipelineId e.g. "jenkins:sample-app"
+     * @return the build's test results, or empty when it has none (or doesn't exist)
+     * @throws PipelineNotFoundException when no configured pipeline has that id
+     */
+    public Optional<CiTestReport> getTestReport(String pipelineId, String buildId) {
+        return ci.getTestReport(pipeline(pipelineId).job(), buildId);
     }
 
     /**

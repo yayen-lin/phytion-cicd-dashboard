@@ -9,6 +9,7 @@ import {Skeleton} from '@/components/ui/skeleton'
 import {getBuilds, triggerBuild, type CiBuilds} from '@/api/ci'
 import StatusBadge from './StatusBadge'
 import BuildDetailsDialog from './BuildDetailsDialog'
+import TestCounts from './TestCounts'
 import {formatDuration} from '@/lib/format'
 
 type Props = {
@@ -64,7 +65,7 @@ function BuildsTable({pipeline}: Props) {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Builds</CardTitle>
-        <CardDescription>Recent builds, newest first</CardDescription>
+        <CardDescription>Recent builds and their tests, newest first</CardDescription>
         <CardAction className="flex gap-2">
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
@@ -94,6 +95,7 @@ function BuildsTable({pipeline}: Props) {
               <TableRow>
                 <TableHead>#</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Tests</TableHead>
                 <TableHead>Commit</TableHead>
                 <TableHead>Branch</TableHead>
                 <TableHead>Started</TableHead>
@@ -117,6 +119,13 @@ function BuildsTable({pipeline}: Props) {
                 >
                   <TableCell className="font-medium">#{build.id}</TableCell>
                   <TableCell><StatusBadge status={build.status}/></TableCell>
+                  <TableCell>
+                    {build.tests ? <TestCounts counts={build.tests}/> : (
+                      <span className="text-sm text-muted-foreground">
+                        {build.status === 'RUNNING' ? 'Running...' : 'No test results'}
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs" title={build.commit ?? undefined}>
                       {build.commit?.slice(0, 7) ?? '-'}

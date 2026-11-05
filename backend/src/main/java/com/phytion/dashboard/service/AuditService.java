@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.phytion.dashboard.model.AuditEntry;
+import com.phytion.dashboard.model.AuditFilter;
 import com.phytion.dashboard.repository.AuditEntryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,19 +38,26 @@ public class AuditService {
         return entries.save(new AuditEntry(username, actionType, target, Instant.now(), actionResult, buildId, details));
     }
 
-    /** Get most recent entries, newest first. */
-    public List<AuditEntry> getRecentEntries() {
-        return entries.findByOrderByIdDesc(Limit.of(maxEntries));
+    /** Get the most recent entries that match the filter, newest first. */
+    public List<AuditEntry> getRecentEntries(AuditFilter filter) {
+        return entries.findFiltered(filter.target(), filter.actionType(), filter.username(), filter.actionResult(),
+                Limit.of(maxEntries));
+    }
+
+    /**
+     * The values in the log that each filter can pick, sorted: only ones that match at least one entry.
+     */
+    public AuditFilterOptions getFilterOptions() {
+        return new AuditFilterOptions(entries.findTargets(), entries.findActionTypes(), entries.findUsernames());
+    }
+
+    public record AuditFilterOptions(List<String> targets, List<AuditEntry.ActionType> actionTypes,
+                                     List<String> usernames) {
     }
 
     /** Who started a build of a target (e.g. the pipeline "jenkins:sample-app") through the dashboard, if anyone. */
     public Optional<String> findBuildStarter(String target, String buildId) {
         return entries.findFirstByTargetAndActionTypeAndBuildIdOrderByIdDesc(target, AuditEntry.ActionType.TRIGGER_BUILD,
                 buildId).map(AuditEntry::getUsername);
-    }
-
-    /** Get most recent entries about one target (e.g. the pipeline "jenkins:sample-app"), newest first. */
-    public List<AuditEntry> getRecentEntries(String target) {
-        return entries.findByTargetOrderByIdDesc(target, Limit.of(maxEntries));
     }
 }

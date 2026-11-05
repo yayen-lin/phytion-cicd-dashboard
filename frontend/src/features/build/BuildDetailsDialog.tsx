@@ -13,6 +13,7 @@ import {
 import {Skeleton} from '@/components/ui/skeleton'
 import {getBuild, type CiBuildDetails} from '@/api/ci'
 import StatusBadge from './StatusBadge'
+import TestResults from './TestResults'
 import {formatDuration} from '@/lib/format'
 
 type Props = {
@@ -101,6 +102,15 @@ function BuildDetails({pipeline, buildId}: { pipeline: string, buildId: string }
             </Field>
           </dl>
 
+          <section className="space-y-3 border-t pt-4">
+            <h3 className="text-sm font-medium">Tests</h3>
+            {build.tests
+              ? <TestResults pipeline={pipeline} buildId={buildId}/>
+              : <p className="text-sm text-muted-foreground">
+                  {build.status === 'RUNNING' ? 'Running...' : 'No test results (the build stopped before the tests).'}
+                </p>}
+          </section>
+
           <DialogFooter>
             <Button variant="outline" asChild>
               <a href={build.url} target="_blank" rel="noreferrer"><ExternalLink/> Open in Jenkins</a>
@@ -116,12 +126,12 @@ function BuildDetails({pipeline, buildId}: { pipeline: string, buildId: string }
   )
 }
 
-/** A build's details in a modal, with links to its page and log in the CI tool. */
+/** A build's details and, below them, its test results, in a modal with links to its page and log in the CI tool. */
 function BuildDetailsDialog({pipeline, buildId, onClose}: Props) {
   return (
     <Dialog open={buildId !== null} onOpenChange={(open) => !open && onClose()}>
       {buildId && (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <BuildDetails key={buildId} pipeline={pipeline} buildId={buildId}/>
         </DialogContent>
       )}

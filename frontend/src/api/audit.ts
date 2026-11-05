@@ -1,5 +1,7 @@
 import {checkLogin} from './client'
 
+export type AuditActionResult = 'SUCCESS' | 'FAILED'
+
 /** One action taken through the dashboard */
 export type AuditEntry = {
   id: number
@@ -7,14 +9,36 @@ export type AuditEntry = {
   actionType: string
   target: string
   createdAt: string
-  actionResult: 'SUCCESS' | 'FAILED' // whether the action worked, not whether the build passed
+  actionResult: AuditActionResult // whether the action worked, not whether the build passed
   buildId: string | null
   details: string | null
 }
 
-/** Returns the most recent audit log entries about a target (e.g. a pipeline id), newest first. */
-export async function getAuditLog(target: string): Promise<AuditEntry[]> {
-  const res = await checkLogin(fetch(`/api/audit?${new URLSearchParams({target})}`))
+/** Which entries to show; a field left out matches every entry */
+export type AuditFilter = {
+  target?: string // e.g. "jenkins:sample-app"
+  actionType?: string // e.g. "TRIGGER_BUILD"
+  username?: string
+  actionResult?: AuditActionResult
+}
+
+/** Returns the most recent audit log entries that match the filter, newest first. */
+export async function getAuditLog(filter: AuditFilter = {}): Promise<AuditEntry[]> {
+  const params = new URLSearchParams(Object.entries(filter).filter(([, value]) => value) as [string, string][])
+  const res = await checkLogin(fetch(`/api/audit?${params}`))
   if (!res.ok) throw new Error(`GET /api/audit failed: ${res.status}`)
+  return res.json()
+}
+
+/** The values each filter can pick: only ones that appear in the log */
+export type AuditFilterOptions = {
+  targets: string[]
+  actionTypes: string[]
+  usernames: string[]
+}
+
+export async function getAuditFilterOptions(): Promise<AuditFilterOptions> {
+  const res = await checkLogin(fetch('/api/audit/filters'))
+  if (!res.ok) throw new Error(`GET /api/audit/filters failed: ${res.status}`)
   return res.json()
 }

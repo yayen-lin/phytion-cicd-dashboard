@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.phytion.dashboard.model.CiBuildDetails;
+import com.phytion.dashboard.model.CiTestReport;
 import com.phytion.dashboard.model.CiBuild;
 
 /**
@@ -16,6 +17,9 @@ public interface JenkinsAdapter {
 
     /** One build of a job with who started it in Jenkins (null if no user did), or empty if it doesn't exist. */
     Optional<CiBuildDetails> getBuild(String job, String buildId);
+
+    /** One build's test results, or empty when the build has none (or doesn't exist). */
+    Optional<CiTestReport> getTestReport(String job, String buildId);
 
     /**
      * Starts a new build of a job. Returns the new build's id, or empty when the tool hasn't started the build yet

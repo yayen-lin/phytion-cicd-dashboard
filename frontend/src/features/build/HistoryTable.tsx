@@ -1,37 +1,32 @@
 import {useCallback, useEffect, useState} from 'react'
 import {RefreshCw} from 'lucide-react'
-import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
 import {getAuditLog, type AuditEntry} from '@/api/audit'
 import {getBuilds, type CiBuild} from '@/api/ci'
-import StatusBadge from './StatusBadge'
+import AuditTable from '@/features/history/AuditTable'
+import BuildDetailsDialog from './BuildDetailsDialog'
 
 type Props = {
   /** Only actions on this pipeline, e.g. "jenkins:sample-app" */
   pipeline: string
 }
 
-/** "TRIGGER_BUILD" -> "Trigger build" */
-function formatActionType(actionType: string): string {
-  const words = actionType.toLowerCase().replaceAll('_', ' ')
-  return words.charAt(0).toUpperCase() + words.slice(1)
-}
-
-/** The actions taken on a pipeline through the dashboard, newest first: who did what, and when. */
+/** The actions taken on one pipeline through the dashboard, newest first: who did what, and when. */
 function HistoryTable({pipeline}: Props) {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null)
   const [error, setError] = useState('')
   // The CI builds, to show the status of the build each entry started
   const [builds, setBuilds] = useState<CiBuild[]>([])
   const [refreshing, setRefreshing] = useState(false)
+  // The build shown in the details modal, or null when it is closed
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const loadHistory = useCallback(() => {
     return Promise.all([
-      getAuditLog(pipeline)
+      getAuditLog({target: pipeline})
         .then((log) => {
           setEntries(log)
           setError('')
@@ -80,45 +75,15 @@ function HistoryTable({pipeline}: Props) {
         ) : entries.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No actions yet.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>When</TableHead>
-                <TableHead>Who</TableHead>
-                <TableHead>What</TableHead>
-                <TableHead>Target</TableHead>
-                <TableHead>Build</TableHead>
-                <TableHead>Build status</TableHead>
-                <TableHead>Action result</TableHead>
-                <TableHead>Details</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {entries.map((entry) => {
-                const build = builds.find((b) => b.id === entry.buildId)
-                return (
-                  <TableRow key={entry.id}>
-                    <TableCell className="text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</TableCell>
-                    <TableCell className="font-medium">{entry.username}</TableCell>
-                    <TableCell>{formatActionType(entry.actionType)}</TableCell>
-                    <TableCell className="font-mono text-xs">{entry.target}</TableCell>
-                    <TableCell>{entry.buildId ? `#${entry.buildId}` : '-'}</TableCell>
-                    <TableCell>{build ? <StatusBadge status={build.status}/> : '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant={entry.actionResult === 'SUCCESS' ? 'outline' : 'destructive'}>
-                        {entry.actionResult === 'SUCCESS' ? 'Done' : 'Failed'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-muted-foreground" title={entry.details ?? undefined}>
-                      {entry.details ?? ''}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
+          <AuditTable
+            entries={entries}
+            showTarget={false}
+            buildOf={(entry) => builds.find((b) => b.id === entry.buildId)}
+            onOpenBuild={(entry) => setSelectedId(entry.buildId)}
+          />
         )}
       </CardContent>
+      <BuildDetailsDialog pipeline={pipeline} buildId={selectedId} onClose={() => setSelectedId(null)}/>
     </Card>
   )
 }

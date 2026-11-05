@@ -10,6 +10,9 @@ import java.util.function.Supplier;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.model.CiBuildDetails;
+import com.phytion.dashboard.model.CiTestCase;
+import com.phytion.dashboard.model.CiTestCounts;
+import com.phytion.dashboard.model.CiTestReport;
 import com.phytion.dashboard.model.CiBuild;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -69,6 +72,23 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                         .body(JenkinsJson.Build.class);
                 return Optional.ofNullable(build).map(b -> new CiBuildDetails(toCiBuild(b), startedBy(b)));
             } catch (HttpClientErrorException.NotFound e) {
+                return Optional.empty();
+            }
+        });
+    }
+
+    @Override
+    public Optional<CiTestReport> getTestReport(String job, String buildId) {
+        return call(() -> {
+            try {
+                JenkinsJson.TestReport report = jenkins.get()
+                        .uri("/job/{job}/{id}/testReport/api/json?tree={tree}", job, buildId,
+                                JenkinsJson.TEST_REPORT_FIELDS)
+                        .retrieve()
+                        .body(JenkinsJson.TestReport.class);
+                return Optional.ofNullable(report).map(JenkinsAdapterImpl::toTestReport);
+            } catch (HttpClientErrorException.NotFound e) {
+                // No such build, or it never published test results
                 return Optional.empty();
             }
         });
@@ -158,7 +178,67 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                 branch,
                 Instant.ofEpochMilli(build.timestamp()),
                 build.inProgress() ? null : build.duration(),
-                build.url());
+                build.url(),
+                testCounts(build));
+    }
+
+    /** The counts from the build's TestResultAction, or null when it has none */
+    private static CiTestCounts testCounts(JenkinsJson.Build build) {
+        if (build.actions() == null) {
+            return null;
+        }
+        return build.actions().stream()
+                .filter(action -> action.totalCount() != null)
+                .findFirst()
+                .map(action -> {
+                    int failed = action.failCount() == null ? 0 : action.failCount();
+                    int skipped = action.skipCount() == null ? 0 : action.skipCount();
+                    return new CiTestCounts(action.totalCount() - failed - skipped, failed, skipped);
+                })
+                .orElse(null);
+    }
+
+    private static CiTestReport toTestReport(JenkinsJson.TestReport report) {
+        List<CiTestCase> cases = report.suites() == null ? List.of() : report.suites().stream()
+                .filter(suite -> suite.cases() != null)
+                .flatMap(suite -> suite.cases().stream())
+                .map(testCase -> {
+                    CiTestCase.Status status = toTestStatus(testCase.status());
+                    return new CiTestCase(
+                            testCase.className(),
+                            testCase.name(),
+                            status,
+                            secondsToMillis(testCase.duration()),
+                            status == CiTestCase.Status.FAILED ? failureMessage(testCase) : null);
+                })
+                .toList();
+        return new CiTestReport(
+                new CiTestCounts(report.passCount(), report.failCount(), report.skipCount()),
+                secondsToMillis(report.duration()),
+                cases);
+    }
+
+    /** The failure's message, or its stack trace when it has no message (e.g. a bare assertTrue) */
+    private static String failureMessage(JenkinsJson.TestCase testCase) {
+        String details = testCase.errorDetails();
+        return details == null || details.isBlank() ? testCase.errorStackTrace() : details;
+    }
+
+    private static CiTestCase.Status toTestStatus(String status) {
+        if (status == null) {
+            return CiTestCase.Status.PASSED;
+        }
+        return switch (status) {
+            // FIXED: passes now, failed in the build before
+            case "PASSED", "FIXED" -> CiTestCase.Status.PASSED;
+            case "SKIPPED" -> CiTestCase.Status.SKIPPED;
+            // REGRESSION: fails now, passed in the build before
+            default -> CiTestCase.Status.FAILED;
+        };
+    }
+
+    private static long secondsToMillis(double seconds) {
+        return Math.round(seconds * 1000);
     }
 
     /** The Jenkins user who started the build, or null when no user did (e.g. a push or a timer) */

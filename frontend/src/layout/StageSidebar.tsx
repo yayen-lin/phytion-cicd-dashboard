@@ -1,5 +1,5 @@
 import {NavLink, useLocation} from 'react-router'
-import {Activity, Boxes, ClipboardList, Code, FlaskConical, Hammer, Rocket, Tag, Workflow} from 'lucide-react'
+import {Activity, Boxes, ClipboardList, Code, Hammer, History, House, Rocket, Tag, Workflow} from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -17,8 +17,7 @@ import {
 /** The CI/CD stages, in pipeline order. Stages without a path aren't built yet. */
 const stages = [
   {label: 'Code', icon: Code, path: '/code'},
-  {label: 'Build', icon: Hammer, path: '/build'},
-  {label: 'Test', icon: FlaskConical},
+  {label: 'Build & Test', icon: Hammer, path: '/build'},
   {label: 'Release', icon: Tag},
   {label: 'Deploy', icon: Rocket},
   {label: 'Operate', icon: Boxes},
@@ -26,7 +25,7 @@ const stages = [
   {label: 'Plan', icon: ClipboardList},
 ]
 
-/** The left sidebar: logo (links to the landing page) and the CI/CD stages. */
+/** The left sidebar: logo and Home (both link to the landing page), and the CI/CD stages. The current page's item is highlighted. */
 function StageSidebar() {
   const {pathname} = useLocation()
 
@@ -47,6 +46,21 @@ function StageSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                {/* Exact match: every path starts with "/" */}
+                <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Home">
+                  <NavLink to="/" end>
+                    <House/>
+                    <span>Home</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>Stages</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -71,6 +85,21 @@ function StageSidebar() {
                   )}
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/history')} tooltip="History">
+                  <NavLink to="/history">
+                    <History/>
+                    <span>History</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

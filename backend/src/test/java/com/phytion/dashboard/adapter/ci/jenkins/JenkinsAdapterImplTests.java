@@ -17,6 +17,9 @@ import java.util.List;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.model.CiBuildDetails;
+import com.phytion.dashboard.model.CiTestCase;
+import com.phytion.dashboard.model.CiTestCounts;
+import com.phytion.dashboard.model.CiTestReport;
 import com.phytion.dashboard.model.CiBuild;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +60,9 @@ class JenkinsAdapterImplTests {
                            "actions": [{"_class": "hudson.model.CauseAction"}, {},
                              {"_class": "hudson.plugins.git.util.BuildData", "lastBuiltRevision": {
                                "SHA1": "cc99f6b852396cb487275a77c5f008e6077bdd0b",
-                               "branch": [{"name": "refs/remotes/origin/main"}]}}]},
+                               "branch": [{"name": "refs/remotes/origin/main"}]}},
+                             {"_class": "hudson.tasks.junit.TestResultAction", "totalCount": 6, "failCount": 1,
+                              "skipCount": 2, "urlName": "testReport"}]},
                           {"_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
                            "number": 1, "result": "FAILURE", "inProgress": false, "timestamp": 1793744856847,
                            "duration": 43745, "url": "http://jenkins/job/sample-app/1/", "actions": []}
@@ -68,11 +73,13 @@ class JenkinsAdapterImplTests {
 
         assertThat(builds).containsExactly(
                 new CiBuild("3", CiBuild.Status.RUNNING, null, null, Instant.ofEpochMilli(1793745100000L), null,
-                        "http://jenkins/job/sample-app/3/"),
+                        "http://jenkins/job/sample-app/3/", null),
+                // totalCount includes the failed and skipped tests
                 new CiBuild("2", CiBuild.Status.SUCCESS, "cc99f6b852396cb487275a77c5f008e6077bdd0b", "main",
-                        Instant.ofEpochMilli(1793745018832L), 5516L, "http://jenkins/job/sample-app/2/"),
+                        Instant.ofEpochMilli(1793745018832L), 5516L, "http://jenkins/job/sample-app/2/",
+                        new CiTestCounts(3, 1, 2)),
                 new CiBuild("1", CiBuild.Status.FAILED, null, null, Instant.ofEpochMilli(1793744856847L), 43745L,
-                        "http://jenkins/job/sample-app/1/"));
+                        "http://jenkins/job/sample-app/1/", null));
         jenkins.verify();
     }
 
@@ -131,6 +138,56 @@ class JenkinsAdapterImplTests {
                 .andRespond(withResourceNotFound());
 
         assertThat(adapter.getBuild("sample-app", "99")).isEmpty();
+    }
+
+    @Test
+    void getTestReportMapsEveryTestCase() {
+        jenkins.expect(requestTo(startsWith("http://jenkins/job/dummy-app/4/testReport/api/json")))
+                .andRespond(withSuccess("""
+                        {"_class": "hudson.tasks.junit.TestResult", "duration": 0.941, "passCount": 2,
+                         "failCount": 2, "skipCount": 1, "suites": [
+                          {"name": "com.phytion.dummyapp.CreditCalculatorTests", "duration": 0.025, "cases": [
+                            {"className": "com.phytion.dummyapp.CreditCalculatorTests", "name": "noMethaneIsNoCredits()",
+                             "status": "PASSED", "duration": 0.014, "errorDetails": null},
+                            {"className": "com.phytion.dummyapp.CreditCalculatorTests", "name": "totalCredits()",
+                             "status": "REGRESSION", "duration": 0.002,
+                             "errorDetails": "expected: <42.0> but was: <41.0>",
+                             "errorStackTrace": "org.opentest4j.AssertionFailedError: expected: <42.0> but was: <41.0>"},
+                            {"className": "com.phytion.dummyapp.CreditCalculatorTests", "name": "negative()",
+                             "status": "FIXED", "duration": 0.001, "errorDetails": null}]},
+                          {"name": "com.phytion.dummyapp.CreditControllerTests", "duration": 0.0, "cases": [
+                            {"className": "com.phytion.dummyapp.CreditControllerTests", "name": "credits()",
+                             "status": "FAILED", "duration": 0.0, "errorDetails": null,
+                             "errorStackTrace": "java.lang.IllegalStateException\\n\\tat CreditController.credits"},
+                            {"className": "com.phytion.dummyapp.CreditControllerTests", "name": "later()",
+                             "status": "SKIPPED", "duration": 0.0, "errorDetails": null}]}
+                        ]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.getTestReport("dummy-app", "4")).contains(new CiTestReport(
+                new CiTestCounts(2, 2, 1),
+                941L,
+                List.of(
+                        new CiTestCase("com.phytion.dummyapp.CreditCalculatorTests", "noMethaneIsNoCredits()",
+                                CiTestCase.Status.PASSED, 14L, null),
+                        new CiTestCase("com.phytion.dummyapp.CreditCalculatorTests", "totalCredits()",
+                                CiTestCase.Status.FAILED, 2L, "expected: <42.0> but was: <41.0>"),
+                        new CiTestCase("com.phytion.dummyapp.CreditCalculatorTests", "negative()",
+                                CiTestCase.Status.PASSED, 1L, null),
+                        new CiTestCase("com.phytion.dummyapp.CreditControllerTests", "credits()",
+                                // No message: the stack trace instead
+                                CiTestCase.Status.FAILED, 0L,
+                                "java.lang.IllegalStateException\n\tat CreditController.credits"),
+                        new CiTestCase("com.phytion.dummyapp.CreditControllerTests", "later()",
+                                CiTestCase.Status.SKIPPED, 0L, null))));
+    }
+
+    @Test
+    void getTestReportOfBuildWithoutTestsIsEmpty() {
+        jenkins.expect(requestTo(startsWith("http://jenkins/job/dummy-app/5/testReport/api/json")))
+                .andRespond(withResourceNotFound());
+
+        assertThat(adapter.getTestReport("dummy-app", "5")).isEmpty();
     }
 
     @Test

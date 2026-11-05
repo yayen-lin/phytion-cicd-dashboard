@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiPipeline;
+import com.phytion.dashboard.model.CiTestReport;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.service.JenkinsCiService;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,12 @@ public class JenkinsCiController {
     @GetMapping("/api/ci/builds/{buildId}")
     public ResponseEntity<CiBuildDetails> getBuild(@PathVariable String buildId, @RequestParam String pipeline) {
         return ResponseEntity.of(ciService.getBuild(pipeline, buildId));
+    }
+
+    /** One build's test results; 404 when the build has none (e.g. it stopped before the tests) or doesn't exist */
+    @GetMapping("/api/ci/builds/{buildId}/tests")
+    public ResponseEntity<CiTestReport> getTestReport(@PathVariable String buildId, @RequestParam String pipeline) {
+        return ResponseEntity.of(ciService.getTestReport(pipeline, buildId));
     }
 
     @PostMapping("/api/ci/builds")

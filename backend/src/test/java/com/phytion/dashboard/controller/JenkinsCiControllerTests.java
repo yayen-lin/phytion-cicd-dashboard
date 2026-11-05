@@ -14,6 +14,9 @@ import java.util.Optional;
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiPipeline;
+import com.phytion.dashboard.model.CiTestCase;
+import com.phytion.dashboard.model.CiTestCounts;
+import com.phytion.dashboard.model.CiTestReport;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.service.PipelineNotFoundException;
 import com.phytion.dashboard.service.JenkinsCiService;
@@ -81,7 +84,7 @@ class JenkinsCiControllerTests {
     void listBuildsReturnsThePipelineAndItsBuilds() throws Exception {
         when(ciService.listBuilds("jenkins:sample-app")).thenReturn(List.of(
                 new CiBuild("2", CiBuild.Status.SUCCESS, "cc99f6b", "main", Instant.parse("2026-11-03T10:00:00Z"),
-                        5516L, "http://jenkins/job/sample-app/2/")));
+                        5516L, "http://jenkins/job/sample-app/2/", new CiTestCounts(5, 1, 0))));
 
         mvc.perform(get("/api/ci/builds").param("pipeline", "jenkins:sample-app"))
                 .andExpect(status().isOk())
@@ -90,7 +93,34 @@ class JenkinsCiControllerTests {
                 .andExpect(jsonPath("$.builds[0].status").value("SUCCESS"))
                 .andExpect(jsonPath("$.builds[0].commit").value("cc99f6b"))
                 .andExpect(jsonPath("$.builds[0].startedAt").value("2026-11-03T10:00:00Z"))
-                .andExpect(jsonPath("$.builds[0].durationMillis").value(5516));
+                .andExpect(jsonPath("$.builds[0].durationMillis").value(5516))
+                .andExpect(jsonPath("$.builds[0].tests.passed").value(5))
+                .andExpect(jsonPath("$.builds[0].tests.failed").value(1));
+    }
+
+    @Test
+    @WithMockUser
+    void getTestReportReturnsCountsAndCases() throws Exception {
+        when(ciService.getTestReport("jenkins:sample-app", "2")).thenReturn(Optional.of(new CiTestReport(
+                new CiTestCounts(1, 1, 0), 941L, List.of(
+                new CiTestCase("com.phytion.sampleapp.HelloControllerTests", "helloReturnsMessage()",
+                        CiTestCase.Status.FAILED, 14L, "expected: <hello> but was: <hi>")))));
+
+        mvc.perform(get("/api/ci/builds/2/tests").param("pipeline", "jenkins:sample-app"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.counts.failed").value(1))
+                .andExpect(jsonPath("$.durationMillis").value(941))
+                .andExpect(jsonPath("$.cases[0].status").value("FAILED"))
+                .andExpect(jsonPath("$.cases[0].errorMessage").value("expected: <hello> but was: <hi>"));
+    }
+
+    @Test
+    @WithMockUser
+    void getTestReportOfBuildWithoutTestsGives404() throws Exception {
+        when(ciService.getTestReport("jenkins:sample-app", "3")).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/ci/builds/3/tests").param("pipeline", "jenkins:sample-app"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -108,7 +138,7 @@ class JenkinsCiControllerTests {
     void getBuildReturnsTheBuildAndWhoStartedIt() throws Exception {
         when(ciService.getBuild("jenkins:sample-app", "2")).thenReturn(Optional.of(new CiBuildDetails(
                 new CiBuild("2", CiBuild.Status.SUCCESS, "cc99f6b", "main",
-                        Instant.parse("2026-11-03T10:00:00Z"), 5516L, "http://jenkins/job/sample-app/2/"),
+                        Instant.parse("2026-11-03T10:00:00Z"), 5516L, "http://jenkins/job/sample-app/2/", null),
                 "andy")));
 
         mvc.perform(get("/api/ci/builds/2").param("pipeline", "jenkins:sample-app"))

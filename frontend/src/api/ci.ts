@@ -25,6 +25,37 @@ export type CiBuild = {
   startedAt: string
   durationMillis: number | null // null while running
   url: string
+  tests: CiTestCounts | null // null when the build has no test results (running, or stopped before the tests)
+}
+
+export type CiTestCounts = {
+  passed: number
+  failed: number
+  skipped: number
+}
+
+/** One test of a build */
+export type CiTestCase = {
+  className: string // e.g. "com.phytion.dummyapp.CreditCalculatorTests"
+  name: string // e.g. "noMethaneIsNoCredits()"
+  status: 'PASSED' | 'FAILED' | 'SKIPPED'
+  durationMillis: number
+  errorMessage: string | null // set only for failed tests
+}
+
+/** All test results of one build */
+export type CiTestReport = {
+  counts: CiTestCounts
+  durationMillis: number
+  cases: CiTestCase[]
+}
+
+/** Returns a build's test results, or null when it has none (e.g. it stopped before the tests). */
+export async function getTestReport(pipeline: string, buildId: string): Promise<CiTestReport | null> {
+  const res = await checkLogin(fetch(`/api/ci/builds/${encodeURIComponent(buildId)}/tests?${new URLSearchParams({pipeline})}`))
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`GET /api/ci/builds/${buildId}/tests failed: ${res.status}`)
+  return res.json()
 }
 
 export type CiBuilds = {

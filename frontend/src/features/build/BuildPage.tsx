@@ -2,28 +2,19 @@ import {useEffect, useState} from 'react'
 import {Navigate, useNavigate, useParams, useSearchParams} from 'react-router'
 import {History, ListChecks} from 'lucide-react'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Skeleton} from '@/components/ui/skeleton'
 import {Tabs, TabsList, TabsTrigger} from '@/components/ui/tabs'
 import {getPipelines, type CiPipeline} from '@/api/ci'
 import BuildsTable from './BuildsTable'
 import HistoryTable from './HistoryTable'
+import PipelineSelect from './PipelineSelect'
 
 const tabs = ['builds', 'history'] as const
 type Tab = typeof tabs[number]
 
-const toolNames: Record<string, string> = {
-  'jenkins': 'Jenkins',
-  'github-actions': 'GitHub Actions',
-}
-
-/** "jenkins:sample-app" -> "Jenkins · sample-app" */
-function pipelineLabel(pipeline: CiPipeline): string {
-  return `${toolNames[pipeline.tool] ?? pipeline.tool} · ${pipeline.job}`
-}
-
 /**
- * The Build stage: pick a pipeline, then see its builds or its history in tabs.
+ * The Build & Test stage (CI tools run both in one run): pick a pipeline, then see its builds with their test
+ * results, or its history, in tabs.
  * The tab is in the path (/build/builds, /build/history), the pipeline in the query (?pipeline=jenkins:sample-app),
  * so every view has its own link.
  */
@@ -53,20 +44,11 @@ function BuildPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Build</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Build & Test</h1>
           <p className="text-sm text-muted-foreground">Builds and tests run by the CI tool</p>
         </div>
         {pipelines && pipeline && (
-          <Select value={pipeline.id} onValueChange={(id) => goTo(tab!, id)}>
-            <SelectTrigger className="w-64" aria-label="Pipeline">
-              <SelectValue/>
-            </SelectTrigger>
-            <SelectContent>
-              {pipelines.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{pipelineLabel(p)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <PipelineSelect pipelines={pipelines} value={pipeline.id} onChange={(id) => goTo(tab!, id)}/>
         )}
       </div>
 

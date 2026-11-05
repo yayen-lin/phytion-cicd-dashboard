@@ -117,39 +117,56 @@ _to discuss_
 
 ### Worklog
 
-What's Done:
-- [x] 1.1 Docker Desktop installed (old computer). Node.js not installed yet
-- [x] 1.2a Backend skeleton in `backend/`: Spring Boot 4.1.2, Java 21, Gradle (Groovy),
-      package `com.phytion.dashboard`, only the web dependency.
-      `GET /api/status` returns `{"status":"ok"}`. `./gradlew build` passes.
-- [x] 1.2b Frontend skeleton in `frontend/`: Vite React + TypeScript template, proxy
-      `/api` to the backend on port 8080, show the `/api/status` result on the page
-- [x] 1.3 Jenkins in Docker, on port **8081** (backend uses 8080). Do this next
-- [x] 1.4 Sample app repo in the Bitbucket workspace `andy-test-app`
-      (https://bitbucket.org/andy-test-app/workspace/overview/): tiny Spring Boot app
-      with a `Jenkinsfile`
-- [x] 1.5 Login with a single user from a file (Spring Security)
+Step 1 (done, for reference):
+- [x] 1.1 Docker Desktop installed
+- [x] 1.2 Skeletons: backend (Spring Boot, `backend/`) and frontend (Vite React + TS, `frontend/`, proxies `/api` to :8080)
+- [x] 1.3 Jenkins in Docker on port 8081
+- [x] 1.4 Bitbucket workspace `andy-test-app`: `sample-app` and `dummy-app` (Spring Boot + `Jenkinsfile`
+      with Build and Test stages), each with a Jenkins job
+- [x] 1.5 Login: one user from a file (Spring Security)
+- [x] 1.6 Jenkins adapter (read-only): list a job's builds
+- [x] 1.7 "Run build" button + audit log (H2 + JPA): who did what, and when
+- [x] 1.8a Frontend look: shadcn/ui, sidebar with the CI/CD stages, Build page with pipeline selector
+      and Builds / History tabs
+- [x] 1.8 Build details modal (status, commit, branch, duration, who started it, links to Jenkins)
+- [x] 1.9 Refresh buttons on the tables (no polling)
+- [x] 1.10 Bitbucket adapter (read-only, no token: repos are public) + Code page: repo selector,
+      Branches and Commits tabs. Repos and CI pipelines listed in `application.properties`.
+      Adapters are named per tool (`JenkinsAdapter`, `BitbucketAdapter`); shared interfaces and
+      profiles wait until a second tool shows the shape
 
-What's Next:
-- [x] 1.6 CI adapter interface + read-only Jenkins adapter: `CiAdapter` with `listRuns(job)`,
-      `getRun(job, id)`; `JenkinsAdapter` calls the Jenkins REST API with URL/user/token from
-      environment variables; `GET /api/ci/runs`; frontend lists the sample-app's builds
-      (number, status, commit, time)
-- [x] 1.7 "Run build" button + action history: `triggerRun(job)` on the adapter; Spring Data JPA
-      + file-based H2; `Action` entity (who, what, target, when, result); `POST /api/ci/runs`
-      triggers the build and records the action; history table in the UI
-- [x] 1.8a Frontend look: shadcn/ui (Tailwind) as the component library; app shell (sidebar with
-      the CI/CD stages, only Build works so far; top bar with theme and user menus; routing);
-      restyle the login page, builds table (status badges) and history table.
-      Build page: pipeline selector (`jenkins:sample-app`, listed in `dashboard.ci.pipelines` in
-      the backend config, served by `GET /api/ci/pipelines`), tabs Builds (`/build/builds`) and
-      History (`/build/history`, the audit log filtered to that pipeline)
-- [x] 1.8 Build details: clicking a build row opens a modal (status, full commit, branch, start
-      time, duration, who started it) with links to the build and its log in Jenkins. One request:
-      `GET /api/ci/builds/{id}?pipeline=` gets the build from Jenkins; "started by" is the dashboard
-      user from the audit log, else the Jenkins user who started it. Later build actions (rebuild, abort, deploy) go as buttons in this modal.
-      Log viewer and test results in the dashboard: skipped for now, Jenkins shows them
-- [x] 1.9 Refresh button for the table
-- [x] 1.10 Bitbucket adapter + profiles: `CodeAdapter` (branches, recent commits),
-      `BitbucketAdapter`, profile config (`code: bitbucket`, `ci: jenkins`) selects the adapters
+Step 2: test results, then release, deploy and operate.
+
+Decisions:
+- Apps run locally on Docker Desktop's built-in Kubernetes, one namespace per environment
+  (`dev`, `staging`, `prod`)
+- Images go to a local registry container for now (AWS ECR later)
+- Version = Jenkins build number + short commit, e.g. `12-b383e44`, so every version points to
+  one build and one commit (the base for tracing credits back to code)
+- Jenkins deploys (a deploy job with app, version and environment as parameters); the dashboard
+  triggers it and records it in the audit log. Kubernetes is only read, to see what runs where
+- Jenkins gets Docker by mounting Docker Desktop's socket and adding the Docker CLI to its image
+
+- [ ] 2.0 Test page (sidebar "Test"): the test results Jenkins already collects (the `Test` stage
+      in each `Jenkinsfile` publishes JUnit results). Per pipeline: recent builds with passed /
+      failed / skipped counts; a build's failing tests with their error message. Read from
+      Jenkins' test report API; builds that never reached the tests show "no test results"
+- [ ] 2.1 Release: Docker CLI + socket for Jenkins; local registry container; a `Dockerfile` in
+      `sample-app` and `dummy-app`; a `Release` stage in each `Jenkinsfile` that builds the image,
+      tags it with the version and pushes it (main branch only). Release page: the versions in the
+      registry, each linked to its build and commit
+- [ ] 2.2 Environments: turn on Kubernetes in Docker Desktop; namespaces `dev`, `staging`, `prod`;
+      each app keeps its Kubernetes files in its repo (`deploy/`), with one overlay per environment
+      for what differs (e.g. replicas, settings). Check Kubernetes can pull from the local registry
+- [ ] 2.3 Deploy: a Jenkins deploy job (parameters: version, environment) that applies the app's
+      `deploy/` files with that image version; Jenkins gets `kubectl` and access to the cluster.
+      Dashboard: "Deploy" button (pick a version and an environment) that triggers the job and
+      records `DEPLOY` in the audit log
+- [ ] 2.4 Environment overview (Deploy page): read-only Kubernetes adapter; a grid of apps x
+      environments showing the running version, its commit, whether it's healthy (ready pods),
+      and when and by whom it was deployed (from the audit log)
+- [ ] 2.5 Promotion: "Promote" moves the exact version running in dev to staging, or staging to
+      prod. Prod asks "are you sure?" (type the environment name to confirm). Recorded as `PROMOTE`
+- [ ] 2.6 Rollback: redeploy the version that ran before in that environment, through the same
+      Jenkins deploy job. Confirmation for prod; recorded as `ROLLBACK`
 
