@@ -141,20 +141,29 @@ Decisions:
 - Apps run locally on Docker Desktop's built-in Kubernetes, one namespace per environment
   (`dev`, `staging`, `prod`)
 - Images go to a local registry container for now (AWS ECR later)
-- Version = Jenkins build number + short commit, e.g. `12-b383e44`, so every version points to
-  one build and one commit (the base for tracing credits back to code)
+- A release is a git tag `vX.Y.Z` (e.g. `v1.4.0`) on a commit on main, made with the dashboard's
+  "Release" button through Bitbucket's API. Only builds of a tag push an image; builds of main
+  run Build and Test only
+- Image tag = the git tag without the `v`, e.g. `sample-app:1.4.0`. The image's labels hold the
+  commit and the Jenkins build number, so every version points to one build and one commit (the
+  base for tracing credits back to code)
+- Any commit on main can be released: the tag build runs Build and Test again, so a failing commit
+  gets no image. A version whose tag build failed is skipped; release the next one (e.g. `v1.4.1`)
+- No webhooks yet, so Jenkins doesn't see new tags by itself: the dashboard creates the tag, then
+  starts a build of that tag (the Jenkins job takes a parameter: the branch or tag to build)
 - Jenkins deploys (a deploy job with app, version and environment as parameters); the dashboard
   triggers it and records it in the audit log. Kubernetes is only read, to see what runs where
 - Jenkins gets Docker by mounting Docker Desktop's socket and adding the Docker CLI to its image
 
-- [ ] 2.0 Test page (sidebar "Test"): the test results Jenkins already collects (the `Test` stage
+- [x] 2.0 Test page (sidebar "Test"): the test results Jenkins already collects (the `Test` stage
       in each `Jenkinsfile` publishes JUnit results). Per pipeline: recent builds with passed /
       failed / skipped counts; a build's failing tests with their error message. Read from
       Jenkins' test report API; builds that never reached the tests show "no test results"
 - [ ] 2.1 Release: Docker CLI + socket for Jenkins; local registry container; a `Dockerfile` in
-      `sample-app` and `dummy-app`; a `Release` stage in each `Jenkinsfile` that builds the image,
-      tags it with the version and pushes it (main branch only). Release page: the versions in the
-      registry, each linked to its build and commit
+      `sample-app` and `dummy-app`; a `Release` stage in each `Jenkinsfile` that builds the image
+      and pushes it (tag builds only). Release page: the versions in the registry, each linked to
+      its build and commit, and a "Release" button that tags a commit on main and starts the tag
+      build. Recorded as `RELEASE`
 - [ ] 2.2 Environments: turn on Kubernetes in Docker Desktop; namespaces `dev`, `staging`, `prod`;
       each app keeps its Kubernetes files in its repo (`deploy/`), with one overlay per environment
       for what differs (e.g. replicas, settings). Check Kubernetes can pull from the local registry
@@ -170,3 +179,59 @@ Decisions:
 - [ ] 2.6 Rollback: redeploy the version that ran before in that environment, through the same
       Jenkins deploy job. Confirmation for prod; recorded as `ROLLBACK`
 
+
+2.1a Jenkins can run Docker (done)
+- jenkins/Dockerfile: the Jenkins image plus the Docker CLI.
+- docker-compose.yml: mount Docker's socket into Jenkins, then rebuild and recreate the container.
+- Check: docker exec jenkins docker version works, and your jobs and builds are still there.
+
+2.1b Local registry (done)
+- A registry service on port 5001 in the same compose file.
+- Check: push a test image to localhost:5001 by hand, then list it through the registry's API.
+
+2.1c Dockerfile in the apps (done)
+- A Dockerfile (plus .dockerignore) in sample-app and dummy-app that packages the jar Jenkins already builds.
+- Check: build the image locally and run it once.
+
+Built first, then changed: a Release stage that pushed an image (tagged <build>-<commit>, e.g. 8-05663bb) on every green
+build of main, a registry adapter + /api/release/apps and /api/release/versions that split that tag into build and commit,
+and a Release page (app selector, versions table, Refresh). The steps below change these to releasing by git tag.
+
+2.1d Jenkins: Release stage only for tag builds
+- Both Jenkins jobs: a parameter for the branch or tag to build (default: main).
+- Both Jenkinsfiles: the Release stage runs only when building a tag. Image tag = the git tag without the "v"
+  (v1.4.0 -> sample-app:1.4.0); the commit, build number and release time go in the image's labels. Removing the local
+  copy of the image after the push can't fail the build.
+- Backend: the Jenkins adapter starts builds with the parameter, so "Run build" keeps working (it builds main).
+- Delete the old images (8-05663bb, 3-aa1044a) by clearing the registry's storage.
+- Check: "Run build" runs Build and Test and pushes nothing; a build of a tag made by hand in git pushes an image with
+  the right labels.
+
+2.1e Backend: versions from the image labels
+- The registry adapter reads the image's labels (they are in the image's config).
+- The service takes the commit, build number and release time from the labels instead of the tag, and sorts versions by
+  version number, newest first (1.10.0 above 1.9.0). Not the image's own "created" date: when the app files didn't change
+  since an earlier build, Docker reuses that build and its old date.
+- Config ties each app to its repo too (needed for commit links and for tagging).
+- Tests updated.
+
+2.1f Frontend: Release page shows the new versions
+- Commit links to Bitbucket; texts no longer say a build of main releases a version.
+- Check: view the page in a browser (after restarting the backend).
+
+2.1g Backend: create tags in Bitbucket
+- A Bitbucket token with write access, from an environment variable, never in git: a repository access token per repo
+  (Repositories: Write), so tags don't depend on a person's account and a leaked token reaches one repo only. Set as
+  dashboard.code.repos[N].token=${BITBUCKET_<APP>_TOKEN:}, with the value in backend/.env. Reading stays anonymous.
+- The Bitbucket adapter creates a tag on a commit, with clear errors (tag already exists, token rejected).
+- Tests.
+
+2.1h Backend: release action
+- An endpoint that checks the version format (vX.Y.Z), creates the tag, starts the tag build and records RELEASE in the
+  audit log. A failure is recorded as FAILED with the reason (also when the tag was made but the build didn't start).
+- Tests.
+
+2.1i Frontend: Release button
+- A dialog on the Release page: pick a commit on main, type the version (format checked as you type).
+- Afterwards: a message with a link to the Jenkins build; the release shows in History.
+- Check: the whole flow in a browser: click -> tag in Bitbucket -> Jenkins build -> version listed.

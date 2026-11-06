@@ -1,6 +1,7 @@
 package com.phytion.dashboard.adapter.ci.jenkins;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.phytion.dashboard.model.CiBuildDetails;
@@ -23,6 +24,9 @@ public interface JenkinsAdapter {
 
     /**
      * Starts a new build of a job. Returns the new build's id, or empty when the tool hasn't started the build yet
+     *
+     * @param parameters the build's parameters, e.g. GIT_REF -> refs/tags/v1.4.0; the job's defaults for the ones left
+     *                   out (for our jobs: build main)
      */
-    Optional<String> triggerBuild(String job);
+    Optional<String> triggerBuild(String job, Map<String, String> parameters);
 }

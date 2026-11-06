@@ -2,6 +2,7 @@ package com.phytion.dashboard.adapter.code.bitbucket;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -45,5 +46,26 @@ final class BitbucketJson {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Link(String href) {
+    }
+
+    /** The body of POST /repositories/{workspace}/{repo}/refs/tags: a new tag on a commit */
+    record NewTag(String name, NewTagTarget target) {
+    }
+
+    /** @param hash the commit's full hash */
+    record NewTagTarget(String hash) {
+    }
+
+    /**
+     * Bitbucket's answer when it refuses a request, e.g. {"type": "error", "error": {"message": "Tag \"v1.4.0\" already
+     * exists"}}
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ErrorResponse(ErrorDetails error) {
+    }
+
+    /** "fields" says what was wrong with which field, e.g. {"target.hash": "ambiguous or non-existent hash"} */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record ErrorDetails(String message, Map<String, Object> fields) {
     }
 }

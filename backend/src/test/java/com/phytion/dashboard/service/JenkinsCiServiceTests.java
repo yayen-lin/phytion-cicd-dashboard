@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
@@ -91,8 +93,22 @@ class JenkinsCiServiceTests {
     }
 
     @Test
+    void startBuildPassesTheParametersAndLeavesTheAuditLogToTheCaller() {
+        when(ci.triggerBuild("sample-app", Map.of("GIT_REF", "refs/tags/v1.4.0"))).thenReturn(Optional.of("12"));
+
+        assertThat(ciService.startBuild("jenkins:sample-app", Map.of("GIT_REF", "refs/tags/v1.4.0"))).contains("12");
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void startBuildOfUnknownPipelineIsRejected() {
+        assertThatThrownBy(() -> ciService.startBuild("jenkins:other-app", Map.of()))
+                .isInstanceOf(PipelineNotFoundException.class);
+    }
+
+    @Test
     void triggerBuildRecordsWhoStartedWhichBuild() {
-        when(ci.triggerBuild("sample-app")).thenReturn(Optional.of("4"));
+        when(ci.triggerBuild("sample-app", Map.of())).thenReturn(Optional.of("4"));
 
         assertThat(ciService.triggerBuild("jenkins:sample-app", "andy")).contains("4");
 
@@ -102,7 +118,7 @@ class JenkinsCiServiceTests {
 
     @Test
     void triggerBuildStillQueuedIsRecordedWithoutBuildId() {
-        when(ci.triggerBuild("sample-app")).thenReturn(Optional.empty());
+        when(ci.triggerBuild("sample-app", Map.of())).thenReturn(Optional.empty());
 
         assertThat(ciService.triggerBuild("jenkins:sample-app", "andy")).isEmpty();
 
@@ -112,7 +128,7 @@ class JenkinsCiServiceTests {
 
     @Test
     void failedTriggerIsRecordedAndRethrown() {
-        when(ci.triggerBuild("sample-app")).thenThrow(new CiToolException("Jenkins not reachable"));
+        when(ci.triggerBuild("sample-app", Map.of())).thenThrow(new CiToolException("Jenkins not reachable"));
 
         assertThatThrownBy(() -> ciService.triggerBuild("jenkins:sample-app", "andy")).isInstanceOf(CiToolException.class);
 

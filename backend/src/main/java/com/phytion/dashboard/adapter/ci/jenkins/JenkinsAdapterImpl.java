@@ -4,6 +4,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -15,7 +16,10 @@ import com.phytion.dashboard.model.CiTestCounts;
 import com.phytion.dashboard.model.CiTestReport;
 import com.phytion.dashboard.model.CiBuild;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
@@ -99,11 +103,19 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
      * The build (and its number) exists once a worker picks the item up, so we ask the queue item until then.
      */
     @Override
-    public Optional<String> triggerBuild(String job) {
+    public Optional<String> triggerBuild(String job, Map<String, String> parameters) {
         return call(() -> {
+            // buildWithParameters, not build: the jobs take a parameter (GIT_REF), and Jenkins uses its default (main)
+            // when it isn't given. The parameters go in a form body, so values like refs/tags/v1.4.0 need no escaping.
             // delay=0sec skips Jenkins' default 5 second "quiet period" before a queued build may start
-            URI queueItem = jenkins.post()
-                    .uri("/job/{job}/build?delay=0sec", job)
+            RestClient.RequestBodySpec request = jenkins.post()
+                    .uri("/job/{job}/buildWithParameters?delay=0sec", job);
+            if (!parameters.isEmpty()) {
+                MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+                parameters.forEach(form::add);
+                request.contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form);
+            }
+            URI queueItem = request
                     .retrieve()
                     .toBodilessEntity()
                     .getHeaders()

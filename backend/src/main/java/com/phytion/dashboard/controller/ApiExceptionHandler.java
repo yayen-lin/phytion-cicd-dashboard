@@ -4,6 +4,9 @@ import java.util.Map;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.code.CodeToolException;
+import com.phytion.dashboard.adapter.release.ReleaseToolException;
+import com.phytion.dashboard.service.AppNotFoundException;
+import com.phytion.dashboard.service.InvalidReleaseException;
 import com.phytion.dashboard.service.PipelineNotFoundException;
 import com.phytion.dashboard.service.RepoNotFoundException;
 import org.slf4j.Logger;
@@ -35,8 +38,21 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));
     }
 
+    // 502 when an external tool is down
+    @ExceptionHandler(ReleaseToolException.class)
+    public ResponseEntity<Map<String, String>> releaseToolFailed(ReleaseToolException e) {
+        log.warn("Release tool request failed", e);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));
+    }
+
+    // 400 when a release is asked for with a bad version or commit
+    @ExceptionHandler(InvalidReleaseException.class)
+    public ResponseEntity<Map<String, String>> invalidRelease(InvalidReleaseException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+    }
+
     /// 404 when requesting an external that isn't configured
-    @ExceptionHandler({PipelineNotFoundException.class, RepoNotFoundException.class})
+    @ExceptionHandler({PipelineNotFoundException.class, RepoNotFoundException.class, AppNotFoundException.class})
     public ResponseEntity<Map<String, String>> notConfigured(RuntimeException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
     }

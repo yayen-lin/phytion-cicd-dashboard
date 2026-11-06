@@ -3,6 +3,7 @@ package com.phytion.dashboard.adapter.ci.jenkins;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withCreatedEntity;
@@ -14,6 +15,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.model.CiBuildDetails;
@@ -27,6 +29,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -198,7 +201,31 @@ class JenkinsAdapterImplTests {
         expectQueueItem("{\"cancelled\": false, \"executable\": {\"number\": 4}}");
         JenkinsAdapterImpl adapterThatWaits = new JenkinsAdapterImpl(builder.build(), properties(Duration.ofSeconds(5)));
 
-        assertThat(adapterThatWaits.triggerBuild("sample-app")).contains("4");
+        assertThat(adapterThatWaits.triggerBuild("sample-app", Map.of())).contains("4");
+        jenkins.verify();
+    }
+
+    @Test
+    void triggerBuildWithoutParametersSendsNoBodySoJenkinsUsesTheDefaults() {
+        jenkins.expect(requestTo("http://jenkins/job/sample-app/buildWithParameters?delay=0sec"))
+                .andExpect(content().string(""))
+                .andRespond(withCreatedEntity(URI.create("http://localhost:8081/queue/item/5/")));
+        expectQueueItem("{\"cancelled\": false, \"executable\": {\"number\": 4}}");
+
+        assertThat(adapter.triggerBuild("sample-app", Map.of())).contains("4");
+        jenkins.verify();
+    }
+
+    @Test
+    void triggerBuildSendsTheParametersAsAForm() {
+        jenkins.expect(requestTo("http://jenkins/job/sample-app/buildWithParameters?delay=0sec"))
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_FORM_URLENCODED))
+                .andExpect(content().formData(MultiValueMap.fromSingleValue(
+                        Map.of("GIT_REF", "refs/tags/v1.4.0"))))
+                .andRespond(withCreatedEntity(URI.create("http://localhost:8081/queue/item/5/")));
+        expectQueueItem("{\"cancelled\": false, \"executable\": {\"number\": 12}}");
+
+        assertThat(adapter.triggerBuild("sample-app", Map.of("GIT_REF", "refs/tags/v1.4.0"))).contains("12");
         jenkins.verify();
     }
 
@@ -207,7 +234,7 @@ class JenkinsAdapterImplTests {
         expectBuildQueued();
         expectQueueItem("{\"cancelled\": false, \"executable\": null}");
 
-        assertThat(adapter.triggerBuild("sample-app")).isEmpty();
+        assertThat(adapter.triggerBuild("sample-app", Map.of())).isEmpty();
         jenkins.verify();
     }
 
@@ -216,7 +243,7 @@ class JenkinsAdapterImplTests {
         expectBuildQueued();
         expectQueueItem("{\"cancelled\": true, \"executable\": null}");
 
-        assertThatThrownBy(() -> adapter.triggerBuild("sample-app"))
+        assertThatThrownBy(() -> adapter.triggerBuild("sample-app", Map.of()))
                 .isInstanceOf(CiToolException.class)
                 .hasMessage("Jenkins cancelled the queued build");
     }
@@ -226,7 +253,7 @@ class JenkinsAdapterImplTests {
         jenkins.expect(method(HttpMethod.POST))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN).body("<html>long error page</html>"));
 
-        assertThatThrownBy(() -> adapter.triggerBuild("sample-app"))
+        assertThatThrownBy(() -> adapter.triggerBuild("sample-app", Map.of()))
                 .isInstanceOf(CiToolException.class)
                 .hasMessage("Jenkins answered 403 Forbidden");
     }
@@ -239,7 +266,7 @@ class JenkinsAdapterImplTests {
     private void expectBuildQueued() {
         // Jenkins answers with its own URL for the queue item, which may not match the URL we use
         jenkins.expect(method(HttpMethod.POST))
-                .andExpect(requestTo("http://jenkins/job/sample-app/build?delay=0sec"))
+                .andExpect(requestTo("http://jenkins/job/sample-app/buildWithParameters?delay=0sec"))
                 .andRespond(withCreatedEntity(URI.create("http://localhost:8081/queue/item/5/")));
     }
 

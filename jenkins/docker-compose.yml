@@ -1,11 +1,27 @@
 services:
   jenkins:
-    image: jenkins/jenkins:lts-jdk25
+    build: .                 # jenkins/jenkins plus the Docker CLI, see Dockerfile
+    image: phytion-jenkins
     container_name: jenkins
     ports:
       - "8081:8080"
     volumes:
       - jenkins_home:/var/jenkins_home # keeps jobs, plugins and users when the container restarts
+      # Docker Desktop's engine, so pipelines can build images. The socket belongs to group 0 (root)
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "0"
+
+  # Where the Release stage pushes images, e.g. localhost:5001/sample-app:12-b383e44 (AWS ECR later).
+  # Port 5001 because macOS' AirPlay Receiver takes 5000
+  registry:
+    image: registry:2.8.3
+    container_name: registry
+    ports:
+      - "5001:5000"
+    volumes:
+      - registry_data:/var/lib/registry # keeps the images when the container restarts
 
 volumes:
   jenkins_home:
+  registry_data:

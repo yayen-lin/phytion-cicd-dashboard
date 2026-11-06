@@ -1,7 +1,7 @@
 import type {CodeCommit} from '@/api/code'
 
 /** The short commit hash, linking to the commit in the code tool. */
-function CommitLink({commit}: { commit: CodeCommit }) {
+function CommitLink({commit}: { commit: Pick<CodeCommit, 'hash' | 'url'> }) {
   return (
     <a
       href={commit.url}

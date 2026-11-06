@@ -1,6 +1,7 @@
 package com.phytion.dashboard.service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
@@ -89,7 +90,7 @@ public class JenkinsCiService {
         CiPipeline pipeline = pipeline(pipelineId);
         Optional<String> buildId;
         try {
-            buildId = ci.triggerBuild(pipeline.job());
+            buildId = ci.triggerBuild(pipeline.job(), Map.of());
         } catch (CiToolException e) {
             audit.add(username, AuditEntry.ActionType.TRIGGER_BUILD, pipeline.id(), AuditEntry.ActionResult.FAILED,
                     null, e.getMessage());
@@ -98,6 +99,20 @@ public class JenkinsCiService {
         audit.add(username, AuditEntry.ActionType.TRIGGER_BUILD, pipeline.id(), AuditEntry.ActionResult.SUCCESS,
                 buildId.orElse(null), buildId.isPresent() ? null : "Queued, but the CI tool hadn't started it yet");
         return buildId;
+    }
+
+    /**
+     * Starts a build of the pipeline's job with parameters, for actions that start a build as one of their steps (e.g.
+     * a release). Not recorded in the audit log: the action records itself, with the build's id.
+     *
+     * @param pipelineId e.g. "jenkins:sample-app"
+     * @param parameters e.g. GIT_REF -> refs/tags/v1.4.0
+     * @return the new build's id, or empty when the CI tool hasn't started the build yet
+     * @throws PipelineNotFoundException when no configured pipeline has that id
+     * @throws CiToolException           when the CI tool can't be reached or refuses
+     */
+    public Optional<String> startBuild(String pipelineId, Map<String, String> parameters) {
+        return ci.triggerBuild(pipeline(pipelineId).job(), parameters);
     }
 
     private CiPipeline pipeline(String pipelineId) {

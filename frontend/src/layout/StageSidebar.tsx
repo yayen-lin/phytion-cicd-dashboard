@@ -18,7 +18,7 @@ import {
 const stages = [
   {label: 'Code', icon: Code, path: '/code'},
   {label: 'Build & Test', icon: Hammer, path: '/build'},
-  {label: 'Release', icon: Tag},
+  {label: 'Release', icon: Tag, path: '/release'},
   {label: 'Deploy', icon: Rocket},
   {label: 'Operate', icon: Boxes},
   {label: 'Monitor', icon: Activity},

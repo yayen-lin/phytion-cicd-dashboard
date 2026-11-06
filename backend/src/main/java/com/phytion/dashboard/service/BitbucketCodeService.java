@@ -2,6 +2,7 @@ package com.phytion.dashboard.service;
 
 import java.util.List;
 
+import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.adapter.code.bitbucket.BitbucketAdapter;
 import com.phytion.dashboard.config.CodeProperties;
 import com.phytion.dashboard.model.CodeBranch;
@@ -10,7 +11,8 @@ import com.phytion.dashboard.model.CodeRepo;
 import org.springframework.stereotype.Service;
 
 /**
- * Branches and commits of the configured code repos. Read-only, so nothing goes in the audit log.
+ * Branches and commits of the configured code repos, and creating tags in them. A tag isn't recorded in the audit log
+ * here: the action that creates it (a release) records itself.
  */
 @Service
 public class BitbucketCodeService {
@@ -56,6 +58,35 @@ public class BitbucketCodeService {
      */
     public List<CodeCommit> listCommits(String repoId, String branch) {
         return code.listCommits(repo(repoId).repo(), branch);
+    }
+
+    /**
+     * The address of a commit's page in the code tool.
+     *
+     * @param repoId e.g. "bitbucket:andy-test-app/sample-app"
+     * @param hash   the commit's full hash
+     * @throws RepoNotFoundException when no configured repo has that id
+     */
+    public String commitUrl(String repoId, String hash) {
+        return code.commitUrl(repo(repoId).repo(), hash);
+    }
+
+    /**
+     * Creates a tag on a commit, with the repo's token.
+     *
+     * @param repoId e.g. "bitbucket:andy-test-app/sample-app"
+     * @param name   the tag, e.g. "v1.4.0"
+     * @param hash   the commit's full hash
+     * @throws RepoNotFoundException when no configured repo has that id
+     * @throws CodeToolException     when the repo has no token, or the code tool refuses (e.g. the tag already exists)
+     */
+    public void createTag(String repoId, String name, String hash) {
+        CodeRepo repo = repo(repoId);
+        if (!repo.hasToken()) {
+            throw new CodeToolException("No token is set for " + repo.id()
+                    + ", so the dashboard can't create tags there");
+        }
+        code.createTag(repo.repo(), repo.token(), name, hash);
     }
 
     private CodeRepo repo(String repoId) {

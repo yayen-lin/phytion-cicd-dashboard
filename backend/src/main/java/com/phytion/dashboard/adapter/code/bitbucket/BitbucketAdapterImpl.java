@@ -2,23 +2,32 @@ package com.phytion.dashboard.adapter.code.bitbucket;
 
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.model.CodeBranch;
 import com.phytion.dashboard.model.CodeCommit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.util.UriComponentsBuilder;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Code adapter for Bitbucket Cloud
  */
 @Component
 public class BitbucketAdapterImpl implements BitbucketAdapter {
+
+    // Reads Bitbucket's error answers, which come with the HTTP error rather than through RestClient
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final RestClient bitbucket;
     private final BitbucketProperties properties;
@@ -64,6 +73,73 @@ public class BitbucketAdapterImpl implements BitbucketAdapter {
                     });
             return values(page).stream().map(BitbucketAdapterImpl::toCommit).toList();
         });
+    }
+
+    @Override
+    public String commitUrl(String repo, String hash) {
+        String[] parts = split(repo);
+        // The same address Bitbucket gives as a commit's links.html.href
+        return UriComponentsBuilder.fromUriString(properties.webUrl())
+                .pathSegment(parts[0], parts[1], "commits", hash)
+                .encode()
+                .toUriString();
+    }
+
+    @Override
+    public void createTag(String repo, String token, String name, String hash) {
+        String[] parts = split(repo);
+        call(() -> {
+            try {
+                bitbucket.post()
+                        .uri("/repositories/{workspace}/{repo}/refs/tags", parts[0], parts[1])
+                        // Only this request sends a token: reading the repos is anonymous
+                        .headers(headers -> headers.setBearerAuth(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(new BitbucketJson.NewTag(name, new BitbucketJson.NewTagTarget(hash)))
+                        .retrieve()
+                        .toBodilessEntity();
+                return null;
+            } catch (HttpClientErrorException e) {
+                throw new CodeToolException(tagRefused(repo, e), e);
+            }
+        });
+    }
+
+    /** Why Bitbucket refused to create a tag, in words the dashboard can show */
+    private static String tagRefused(String repo, HttpClientErrorException e) {
+        return switch (e.getStatusCode().value()) {
+            // e.g. the tag already exists, or there's no such commit
+            case 400 -> "Bitbucket refused the tag: " + errorReason(e);
+            case 401 -> "Bitbucket rejected the token for " + repo + " (invalid or expired)";
+            case 403 -> "The token for " + repo + " may not create tags (it needs Repositories: Write)";
+            // What Bitbucket answers for another repo's token, rather than 403
+            case 404 -> "Bitbucket didn't find " + repo + " with its token (is it that repo's token?)";
+            default -> "Bitbucket answered " + e.getStatusCode().value() + " " + e.getStatusText();
+        };
+    }
+
+    /**
+     * Bitbucket's message, with what was wrong with which field when it says, e.g. "Tag "v1.4.0" already exists" or
+     * "Bad request (target.hash: ambiguous or non-existent hash)"
+     */
+    private static String errorReason(HttpClientErrorException e) {
+        BitbucketJson.ErrorDetails error;
+        try {
+            BitbucketJson.ErrorResponse response =
+                    JSON.readValue(e.getResponseBodyAsString(), BitbucketJson.ErrorResponse.class);
+            error = response == null ? null : response.error();
+        } catch (JacksonException notJson) {
+            error = null;
+        }
+        if (error == null || error.message() == null) {
+            return e.getStatusCode().value() + " " + e.getStatusText();
+        }
+        if (error.fields() == null || error.fields().isEmpty()) {
+            return error.message();
+        }
+        return error.fields().entrySet().stream()
+                .map(field -> field.getKey() + ": " + field.getValue())
+                .collect(Collectors.joining(", ", error.message() + " (", ")"));
     }
 
     /** "andy-test-app/sample-app" -> ["andy-test-app", "sample-app"], as separate path parts so "/" isn't encoded */

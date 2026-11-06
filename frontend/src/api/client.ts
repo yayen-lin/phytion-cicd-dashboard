@@ -22,11 +22,31 @@ export async function checkLogin(response: Promise<Response>): Promise<Response>
 
 /** POST with the CSRF token the backend asks for */
 export async function post(url: string, body?: URLSearchParams): Promise<Response> {
+  return sendPost(url, {}, body)
+}
+
+/** POST of a JSON body, with the CSRF token the backend asks for */
+export async function postJson(url: string, data: unknown): Promise<Response> {
+  return sendPost(url, {'Content-Type': 'application/json'}, JSON.stringify(data))
+}
+
+async function sendPost(url: string, headers: Record<string, string>, body?: BodyInit): Promise<Response> {
   // The cookie is gone after logout; any GET makes the backend set a new one
   if (!csrfToken()) await fetch('/api/status')
   return fetch(url, {
     method: 'POST',
-    headers: {'X-XSRF-TOKEN': csrfToken() ?? ''},
+    headers: {...headers, 'X-XSRF-TOKEN': csrfToken() ?? ''},
     body,
   })
+}
+
+/** The backend's reason for a failed call ({"error": "..."}), or the status when it gave none */
+export async function errorMessage(res: Response): Promise<string> {
+  try {
+    const data: { error?: unknown } = await res.json()
+    if (typeof data.error === 'string' && data.error) return data.error
+  } catch {
+    // Not JSON, e.g. a proxy's error page
+  }
+  return `The backend answered ${res.status}`
 }
