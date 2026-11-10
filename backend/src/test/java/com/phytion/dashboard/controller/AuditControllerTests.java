@@ -1,7 +1,6 @@
 package com.phytion.dashboard.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -112,22 +111,5 @@ class AuditControllerTests {
     @WithMockUser
     void unknownActionTypeIsABadRequest() throws Exception {
         mvc.perform(get("/api/audit").param("actionType", "NOPE")).andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @WithMockUser
-    void filterOptionsListWhatIsInTheLogOnce() throws Exception {
-        entries.save(new AuditEntry("sam", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
-                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null));
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:dummy-app",
-                Instant.parse("2026-11-03T11:00:00Z"), AuditEntry.ActionResult.SUCCESS, "1", null));
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:dummy-app",
-                Instant.parse("2026-11-03T12:00:00Z"), AuditEntry.ActionResult.SUCCESS, "2", null));
-
-        mvc.perform(get("/api/audit/filters"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.targets").value(contains("jenkins:dummy-app", "jenkins:sample-app")))
-                .andExpect(jsonPath("$.actionTypes").value(contains("TRIGGER_BUILD")))
-                .andExpect(jsonPath("$.usernames").value(contains("andy", "sam")));
     }
 }

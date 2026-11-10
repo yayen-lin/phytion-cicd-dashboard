@@ -1,5 +1,5 @@
-import {LogOut, UserRound} from 'lucide-react'
-import {Button} from '@/components/ui/button'
+import { LogOut, UserRound } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,16 +8,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {useAuth} from '@/auth/AuthContext'
+import { useAuth } from '@/auth/AuthContext'
 
 /** The logged-in user's name, with Log out. */
 function UserMenu() {
-  const {user, logout} = useAuth()
+  const { user, logout } = useAuth()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="gap-2">
-          <UserRound/>
+          <UserRound />
           <span className="hidden sm:inline">{user.username}</span>
         </Button>
       </DropdownMenuTrigger>
@@ -25,9 +25,9 @@ function UserMenu() {
         <DropdownMenuLabel>
           Logged in as <span className="font-semibold">{user.username}</span>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator/>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={logout}>
-          <LogOut/> Log out
+          <LogOut /> Log out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

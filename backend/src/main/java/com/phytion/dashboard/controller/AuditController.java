@@ -20,7 +20,7 @@ public class AuditController {
     private final AuditService auditService;
 
     /**
-     * The most recent entries, newest first. Each parameter left out matches every entry.
+     * Get most recent entries, newest first.
      *
      * @param target       e.g. "jenkins:sample-app"
      * @param actionType   e.g. TRIGGER_BUILD
@@ -34,11 +34,5 @@ public class AuditController {
             @RequestParam(required = false) String username,
             @RequestParam(required = false) AuditEntry.ActionResult actionResult) {
         return auditService.getRecentEntries(new AuditFilter(target, actionType, username, actionResult));
-    }
-
-    /** The targets, action types and users that appear in the log, for the filter dropdowns */
-    @GetMapping("/api/audit/filters")
-    public AuditService.AuditFilterOptions filterOptions() {
-        return auditService.getFilterOptions();
     }
 }

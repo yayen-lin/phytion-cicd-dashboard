@@ -6,7 +6,7 @@ import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} f
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Skeleton} from '@/components/ui/skeleton'
-import {getAuditFilterOptions, getAuditLog, type AuditEntry, type AuditFilter, type AuditFilterOptions} from '@/api/audit'
+import {getAuditLog, type AuditEntry, type AuditFilter} from '@/api/audit'
 import {getBuilds, getPipelines, type CiBuild} from '@/api/ci'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import {formatActionType} from '@/lib/format'
@@ -49,7 +49,6 @@ function FilterSelect({label, value, options, onChange}: FilterSelectProps) {
 function HistoryPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [entries, setEntries] = useState<AuditEntry[] | null>(null)
-  const [options, setOptions] = useState<AuditFilterOptions | null>(null)
   // The configured pipelines' ids: only their builds can be looked up and opened
   const [pipelineIds, setPipelineIds] = useState<string[]>([])
   // Each pipeline's recent builds, for the build status column
@@ -68,12 +67,10 @@ function HistoryPage() {
   const loadHistory = useCallback(() => {
     return Promise.all([
       getAuditLog(),
-      getAuditFilterOptions(),
       getPipelines(),
     ])
-      .then(([log, filterOptions, pipelines]) => {
+      .then(([log, pipelines]) => {
         setEntries(log)
-        setOptions(filterOptions)
         setError('')
 
         // The builds of each pipeline in the table, once per pipeline. If the CI tool is down, that column shows "-"
@@ -105,6 +102,14 @@ function HistoryPage() {
     setSearchParams(next)
   }
 
+  // The values each dropdown can pick: the ones in the loaded log, sorted
+  const distinct = (pick: (e: AuditEntry) => string) => [...new Set((entries ?? []).map(pick))].sort()
+  const options = {
+    targets: distinct((e) => e.target),
+    actionTypes: distinct((e) => e.actionType),
+    usernames: distinct((e) => e.username),
+  }
+
   const filtered = filterKeys.some((key) => searchParams.has(key))
   const shownEntries = entries?.filter((e) =>
     (!target || e.target === target)
@@ -121,13 +126,13 @@ function HistoryPage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <FilterSelect label="Targets" value={target}
-                      options={(options?.targets ?? []).map((t) => ({value: t, label: t}))}
+                      options={options.targets.map((t) => ({value: t, label: t}))}
                       onChange={(v) => setFilter('target', v)}/>
         <FilterSelect label="Actions" value={actionType}
-                      options={(options?.actionTypes ?? []).map((a) => ({value: a, label: formatActionType(a)}))}
+                      options={options.actionTypes.map((a) => ({value: a, label: formatActionType(a)}))}
                       onChange={(v) => setFilter('actionType', v)}/>
         <FilterSelect label="Users" value={username}
-                      options={(options?.usernames ?? []).map((u) => ({value: u, label: u}))}
+                      options={options.usernames.map((u) => ({value: u, label: u}))}
                       onChange={(v) => setFilter('username', v)}/>
         <FilterSelect label="Results" value={actionResult}
                       options={[{value: 'SUCCESS', label: 'Done'}, {value: 'FAILED', label: 'Failed'}]}

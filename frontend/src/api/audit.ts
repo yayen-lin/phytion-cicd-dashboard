@@ -29,16 +29,3 @@ export async function getAuditLog(filter: AuditFilter = {}): Promise<AuditEntry[
   if (!res.ok) throw new Error(`GET /api/audit failed: ${res.status}`)
   return res.json()
 }
-
-/** The values each filter can pick: only ones that appear in the log */
-export type AuditFilterOptions = {
-  targets: string[]
-  actionTypes: string[]
-  usernames: string[]
-}
-
-export async function getAuditFilterOptions(): Promise<AuditFilterOptions> {
-  const res = await checkLogin(fetch('/api/audit/filters'))
-  if (!res.ok) throw new Error(`GET /api/audit/filters failed: ${res.status}`)
-  return res.json()
-}

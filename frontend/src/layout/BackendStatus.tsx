@@ -1,7 +1,7 @@
-import {useEffect, useState} from 'react'
-import {Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip'
-import {getBackendStatus} from '@/api/status'
-import {cn} from '@/lib/utils'
+import { useEffect, useState } from 'react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { getBackendStatus } from '@/api/status'
+import { cn } from '@/lib/utils'
 
 /** A dot that is green when the backend answers "ok". */
 function BackendStatus() {
@@ -17,7 +17,7 @@ function BackendStatus() {
     <Tooltip>
       <TooltipTrigger asChild>
         <span className="mr-2 flex items-center gap-2 text-xs text-muted-foreground">
-          <span className={cn('size-2 rounded-full', status === 'ok' ? 'bg-emerald-500' : 'bg-amber-500')}/>
+          <span className={cn('size-2 rounded-full', status === 'ok' ? 'bg-emerald-500' : 'bg-amber-500')} />
           <span className="hidden sm:inline">Backend</span>
         </span>
       </TooltipTrigger>

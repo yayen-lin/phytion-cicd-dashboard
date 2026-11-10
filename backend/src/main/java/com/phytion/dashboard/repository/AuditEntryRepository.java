@@ -13,7 +13,6 @@ import org.springframework.data.jpa.repository.Query;
  */
 public interface AuditEntryRepository extends JpaRepository<AuditEntry, Long> {
 
-    /** Newest first. A null filter matches every entry. */
     @Query("""
             SELECT e FROM AuditEntry e
             WHERE (:target IS NULL OR e.target = :target)
@@ -25,16 +24,7 @@ public interface AuditEntryRepository extends JpaRepository<AuditEntry, Long> {
     List<AuditEntry> findFiltered(String target, AuditEntry.ActionType actionType, String username,
                                   AuditEntry.ActionResult actionResult, Limit limit);
 
-    @Query("SELECT DISTINCT e.target FROM AuditEntry e ORDER BY e.target")
-    List<String> findTargets();
-
-    @Query("SELECT DISTINCT e.actionType FROM AuditEntry e ORDER BY e.actionType")
-    List<AuditEntry.ActionType> findActionTypes();
-
-    @Query("SELECT DISTINCT e.username FROM AuditEntry e ORDER BY e.username")
-    List<String> findUsernames();
-
     Optional<AuditEntry> findFirstByTargetAndActionTypeAndBuildIdOrderByIdDesc(String target,
-                                                                                AuditEntry.ActionType actionType,
-                                                                                String buildId);
+                                                                               AuditEntry.ActionType actionType,
+                                                                               String buildId);
 }
