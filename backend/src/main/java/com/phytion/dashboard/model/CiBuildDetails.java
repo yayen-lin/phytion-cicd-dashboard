@@ -3,9 +3,10 @@ package com.phytion.dashboard.model;
 /**
  * One build with the details only the single-build view shows.
  *
- * @param build     the build, as in the builds list
- * @param startedBy who started the build: the dashboard user when it was started through the dashboard, otherwise
- *                  the CI tool's user; null when no user started it (e.g. a push or a timer)
+ * @param build           the build, as in the builds list
+ * @param startedBy       who started the build
+ * @param startedBySource where the {@code startedBy} name comes from
  */
-public record CiBuildDetails(CiBuild build, String startedBy) {
+public record CiBuildDetails(CiBuild build, String startedBy, String startedBySource) {
+    public static final String DASHBOARD = "dashboard";
 }

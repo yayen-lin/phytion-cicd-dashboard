@@ -22,7 +22,7 @@ public class BitbucketCodeController {
 
     @GetMapping("/api/code/repos")
     public List<RepoResponse> listRepos() {
-        return codeService.repos().stream().map(RepoResponse::new).toList();
+        return codeService.listRepos().stream().map(RepoResponse::new).toList();
     }
 
     /**

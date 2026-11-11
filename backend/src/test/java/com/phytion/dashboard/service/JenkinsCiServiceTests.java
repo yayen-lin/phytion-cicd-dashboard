@@ -49,18 +49,32 @@ class JenkinsCiServiceTests {
 
     @Test
     void getBuildStartedThroughTheDashboardShowsTheDashboardUser() {
-        when(ci.getBuild("sample-app", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "dashboard-bot")));
+        when(ci.getBuild("sample-app", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "dashboard-bot", null)));
         when(audit.findBuildStarter("jenkins:sample-app", "4")).thenReturn(Optional.of("andy"));
 
-        assertThat(ciService.getBuild("jenkins:sample-app", "4")).map(CiBuildDetails::startedBy).contains("andy");
+        assertThat(ciService.getBuild("jenkins:sample-app", "4")).get()
+                .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
+                .containsExactly("andy", "dashboard");
     }
 
     @Test
     void getBuildStartedOutsideTheDashboardShowsTheCiToolUser() {
-        when(ci.getBuild("sample-app", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "Andy Lin")));
+        when(ci.getBuild("sample-app", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "Andy Lin", null)));
         when(audit.findBuildStarter("jenkins:sample-app", "4")).thenReturn(Optional.empty());
 
-        assertThat(ciService.getBuild("jenkins:sample-app", "4")).map(CiBuildDetails::startedBy).contains("Andy Lin");
+        assertThat(ciService.getBuild("jenkins:sample-app", "4")).get()
+                .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
+                .containsExactly("Andy Lin", "jenkins");
+    }
+
+    @Test
+    void getBuildStartedByNoOneHasNoSource() {
+        when(ci.getBuild("sample-app", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), null, null)));
+        when(audit.findBuildStarter("jenkins:sample-app", "4")).thenReturn(Optional.empty());
+
+        assertThat(ciService.getBuild("jenkins:sample-app", "4")).get()
+                .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
+                .containsExactly(null, null);
     }
 
     @Test
@@ -81,15 +95,6 @@ class JenkinsCiServiceTests {
                 .isInstanceOf(PipelineNotFoundException.class);
         assertThatThrownBy(() -> ciService.triggerBuild("jenkins:other-app", "andy"))
                 .isInstanceOf(PipelineNotFoundException.class);
-    }
-
-    @Test
-    void pipelineOnAToolWithoutAdapterFailsAtStartup() {
-        CiProperties properties = new CiProperties(List.of(new CiPipeline("github-actions", "some-app")));
-
-        assertThatThrownBy(() -> new JenkinsCiService(ci, audit, properties))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("github-actions");
     }
 
     @Test

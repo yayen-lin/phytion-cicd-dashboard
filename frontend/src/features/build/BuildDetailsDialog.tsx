@@ -1,6 +1,7 @@
 import {useEffect, useState, type ReactNode} from 'react'
 import {Check, Copy, ExternalLink, GitBranch, ScrollText} from 'lucide-react'
 import {Alert, AlertDescription} from '@/components/ui/alert'
+import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
 import {
   Dialog,
@@ -97,7 +98,12 @@ function BuildDetails({pipeline, buildId}: { pipeline: string, buildId: string }
             <Field label="Duration"><span className="tabular-nums">{formatDuration(build.durationMillis)}</span></Field>
             <Field label="Started by">
               {details.startedBy
-                ? <span className="font-medium">{details.startedBy}</span>
+                ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="font-medium">{details.startedBy}</span>
+                    {details.startedBySource && <Badge variant="outline">via {details.startedBySource}</Badge>}
+                  </span>
+                )
                 : <span className="text-muted-foreground">No user (e.g. a push or a timer)</span>}
             </Field>
           </dl>

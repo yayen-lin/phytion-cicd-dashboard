@@ -26,9 +26,6 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class RegistryReleaseService {
-
-    private static final String REGISTRY = "registry";
-
     // The labels the Release stage of each app's Jenkinsfile puts on the image
     private static final String LABEL_CREATED = "org.opencontainers.image.created";
     private static final String LABEL_COMMIT = "org.opencontainers.image.revision";
@@ -61,11 +58,6 @@ public class RegistryReleaseService {
                                   CiProperties ciProperties, RegistryProperties registryProperties) {
         // Fail at startup rather than on the first request
         for (ReleaseApp app : properties.apps()) {
-            // The registry is the only release tool with an adapter so far
-            if (!REGISTRY.equals(app.tool())) {
-                throw new IllegalStateException("No adapter for release tool '" + app.tool()
-                        + "' (app " + app.id() + "); only 'registry' is supported");
-            }
             if (codeProperties.repos().stream().noneMatch(repo -> repo.id().equals(app.repo()))) {
                 throw new IllegalStateException("App " + app.id() + " has repo '" + app.repo()
                         + "', which isn't one of the code repos (dashboard.code.repos)");

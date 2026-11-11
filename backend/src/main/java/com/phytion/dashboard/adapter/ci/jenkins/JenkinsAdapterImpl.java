@@ -74,7 +74,7 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                         .uri("/job/{job}/{id}/api/json?tree={tree}", job, buildId, JenkinsJson.BUILD_DETAIL_FIELDS)
                         .retrieve()
                         .body(JenkinsJson.Build.class);
-                return Optional.ofNullable(build).map(b -> new CiBuildDetails(toCiBuild(b), startedBy(b)));
+                return Optional.ofNullable(build).map(b -> new CiBuildDetails(toCiBuild(b), startedBy(b), null));
             } catch (HttpClientErrorException.NotFound e) {
                 return Optional.empty();
             }
@@ -92,7 +92,6 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                         .body(JenkinsJson.TestReport.class);
                 return Optional.ofNullable(report).map(JenkinsAdapterImpl::toTestReport);
             } catch (HttpClientErrorException.NotFound e) {
-                // No such build, or it never published test results
                 return Optional.empty();
             }
         });
@@ -105,9 +104,6 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
     @Override
     public Optional<String> triggerBuild(String job, Map<String, String> parameters) {
         return call(() -> {
-            // buildWithParameters, not build: the jobs take a parameter (GIT_REF), and Jenkins uses its default (main)
-            // when it isn't given. The parameters go in a form body, so values like refs/tags/v1.4.0 need no escaping.
-            // delay=0sec skips Jenkins' default 5 second "quiet period" before a queued build may start
             RestClient.RequestBodySpec request = jenkins.post()
                     .uri("/job/{job}/buildWithParameters?delay=0sec", job);
             if (!parameters.isEmpty()) {
@@ -194,7 +190,9 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                 testCounts(build));
     }
 
-    /** The counts from the build's TestResultAction, or null when it has none */
+    /**
+     * The counts from the build's TestResultAction, or null when it has none
+     */
     private static CiTestCounts testCounts(JenkinsJson.Build build) {
         if (build.actions() == null) {
             return null;
@@ -230,7 +228,9 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                 cases);
     }
 
-    /** The failure's message, or its stack trace when it has no message (e.g. a bare assertTrue) */
+    /**
+     * The failure's message, or its stack trace when it has no message (e.g. a bare assertTrue)
+     */
     private static String failureMessage(JenkinsJson.TestCase testCase) {
         String details = testCase.errorDetails();
         return details == null || details.isBlank() ? testCase.errorStackTrace() : details;
@@ -253,7 +253,9 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
         return Math.round(seconds * 1000);
     }
 
-    /** The Jenkins user who started the build, or null when no user did (e.g. a push or a timer) */
+    /**
+     * The Jenkins user who started the build, or null when no user did (e.g. a push or a timer)
+     */
     private static String startedBy(JenkinsJson.Build build) {
         if (build.actions() == null) {
             return null;

@@ -13,7 +13,6 @@ final class JenkinsJson {
     private JenkinsJson() {
     }
 
-    /** GET /job/{job}/api/json */
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Job(List<Build> builds) {
     }
@@ -23,16 +22,15 @@ final class JenkinsJson {
             "number,result,inProgress,timestamp,duration,url,"
                     + "actions[lastBuiltRevision[SHA1,branch[name]],totalCount,failCount,skipCount]";
 
-    // BUILD_FIELDS plus what started the build, for the single-build view
+    // BUILD_FIELDS plus what started the build
     static final String BUILD_DETAIL_FIELDS =
             "number,result,inProgress,timestamp,duration,url,"
                     + "actions[lastBuiltRevision[SHA1,branch[name]],totalCount,failCount,skipCount,causes[userId,userName]]";
 
-    // A build's test report, for the test results view
+    // A build's test report
     static final String TEST_REPORT_FIELDS =
             "duration,passCount,failCount,skipCount,suites[cases[className,name,status,duration,errorDetails,errorStackTrace]]";
 
-    /** GET /job/{job}/{number}/api/json, and each entry of Job.builds */
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Build(
             long number,

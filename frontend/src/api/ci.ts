@@ -51,8 +51,8 @@ export type CiTestReport = {
 }
 
 /** Returns a build's test results, or null when it has none (e.g. it stopped before the tests). */
-export async function getTestReport(pipeline: string, buildId: string): Promise<CiTestReport | null> {
-  const res = await checkLogin(fetch(`/api/ci/builds/${encodeURIComponent(buildId)}/tests?${new URLSearchParams({pipeline})}`))
+export async function getTestReport(pipelineId: string, buildId: string): Promise<CiTestReport | null> {
+  const res = await checkLogin(fetch(`/api/ci/builds/${encodeURIComponent(buildId)}/tests?${new URLSearchParams({ pipelineId })}`))
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`GET /api/ci/builds/${buildId}/tests failed: ${res.status}`)
   return res.json()
@@ -64,8 +64,8 @@ export type CiBuilds = {
 }
 
 /** Returns the recent builds of a pipeline, newest first. */
-export async function getBuilds(pipeline: string): Promise<CiBuilds> {
-  const res = await checkLogin(fetch(`/api/ci/builds?${new URLSearchParams({pipeline})}`))
+export async function getBuilds(pipelineId: string): Promise<CiBuilds> {
+  const res = await checkLogin(fetch(`/api/ci/builds?${new URLSearchParams({ pipelineId })}`))
   if (!res.ok) throw new Error(`GET /api/ci/builds failed: ${res.status}`)
   return res.json()
 }
@@ -75,11 +75,13 @@ export type CiBuildDetails = {
   build: CiBuild
   /** The dashboard user when started through the dashboard, else the CI tool's user; null when no user did (push, timer) */
   startedBy: string | null
+  /** Where startedBy comes from: "dashboard", or the CI tool's id (e.g. "jenkins"); null when no one started it */
+  startedBySource: string | null
 }
 
 /** Returns one build of a pipeline. */
-export async function getBuild(pipeline: string, buildId: string): Promise<CiBuildDetails> {
-  const res = await checkLogin(fetch(`/api/ci/builds/${encodeURIComponent(buildId)}?${new URLSearchParams({pipeline})}`))
+export async function getBuild(pipelineId: string, buildId: string): Promise<CiBuildDetails> {
+  const res = await checkLogin(fetch(`/api/ci/builds/${encodeURIComponent(buildId)}?${new URLSearchParams({ pipelineId })}`))
   if (!res.ok) throw new Error(`GET /api/ci/builds/${buildId} failed: ${res.status}`)
   return res.json()
 }
@@ -88,8 +90,8 @@ export async function getBuild(pipeline: string, buildId: string): Promise<CiBui
  * Starts a build of a pipeline. Returns the new build's id, or null when the CI tool
  * hasn't started it yet (still queued). Can take up to ~30 seconds.
  */
-export async function triggerBuild(pipeline: string): Promise<string | null> {
-  const res = await checkLogin(post(`/api/ci/builds?${new URLSearchParams({pipeline})}`))
+export async function triggerBuild(pipelineId: string): Promise<string | null> {
+  const res = await checkLogin(post(`/api/ci/builds?${new URLSearchParams({ pipelineId })}`))
   if (!res.ok) throw new Error(`POST /api/ci/builds failed: ${res.status}`)
   const data: { buildId: string | null } = await res.json()
   return data.buildId

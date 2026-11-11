@@ -1,14 +1,12 @@
 package com.phytion.dashboard.model;
 
 /**
- * A CI job the dashboard shows, and the tool that runs it. Configured in application.properties.
+ * A CI pipeline the dashboard shows, and the external tool that runs and hosts it.
  *
- * @param tool which CI tool runs the job, e.g. "jenkins"
- * @param job  the job's name in that tool, e.g. "sample-app"
+ * @param tool which CI tool runs the pipeline
+ * @param job  the job's name in that tool
  */
 public record CiPipeline(String tool, String job) {
-
-    /** e.g. "jenkins:sample-app": how the API and the audit log refer to the pipeline */
     public String id() {
         return tool + ":" + job;
     }

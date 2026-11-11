@@ -3,7 +3,7 @@ package com.phytion.dashboard.model;
 import java.time.Instant;
 
 /**
- * One build of a CI job
+ * One build of a pipeline job
  *
  * @param id             the build's id in the CI tool, e.g. the build number in Jenkins
  * @param status         where the build is at

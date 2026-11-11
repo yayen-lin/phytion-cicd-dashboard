@@ -27,32 +27,29 @@ public class JenkinsCiController {
 
     @GetMapping("/api/ci/pipelines")
     public List<PipelineResponse> listPipelines() {
-        return ciService.pipelines().stream().map(PipelineResponse::new).toList();
+        return ciService.listPipelines().stream().map(PipelineResponse::new).toList();
     }
 
     @GetMapping("/api/ci/builds")
-    public BuildsResponse listBuilds(@RequestParam String pipeline) {
-        return new BuildsResponse(pipeline, ciService.listBuilds(pipeline));
+    public BuildsResponse listBuilds(@RequestParam String pipelineId) {
+        return new BuildsResponse(pipelineId, ciService.listBuilds(pipelineId));
     }
 
-    /** One build with who started it; 404 when the CI tool has no such build */
     @GetMapping("/api/ci/builds/{buildId}")
-    public ResponseEntity<CiBuildDetails> getBuild(@PathVariable String buildId, @RequestParam String pipeline) {
-        return ResponseEntity.of(ciService.getBuild(pipeline, buildId));
+    public ResponseEntity<CiBuildDetails> getBuild(@PathVariable String buildId, @RequestParam String pipelineId) {
+        return ResponseEntity.of(ciService.getBuild(pipelineId, buildId));
     }
 
-    /** One build's test results; 404 when the build has none (e.g. it stopped before the tests) or doesn't exist */
     @GetMapping("/api/ci/builds/{buildId}/tests")
-    public ResponseEntity<CiTestReport> getTestReport(@PathVariable String buildId, @RequestParam String pipeline) {
-        return ResponseEntity.of(ciService.getTestReport(pipeline, buildId));
+    public ResponseEntity<CiTestReport> getTestReport(@PathVariable String buildId, @RequestParam String pipelineId) {
+        return ResponseEntity.of(ciService.getTestReport(pipelineId, buildId));
     }
 
     @PostMapping("/api/ci/builds")
-    public TriggerResponse triggerBuild(@RequestParam String pipeline, Authentication authentication) {
-        return new TriggerResponse(ciService.triggerBuild(pipeline, authentication.getName()).orElse(null));
+    public TriggerResponse triggerBuild(@RequestParam String pipelineId, Authentication authentication) {
+        return new TriggerResponse(ciService.triggerBuild(pipelineId, authentication.getName()).orElse(null));
     }
 
-    /** @param id e.g. "jenkins:sample-app" */
     public record PipelineResponse(String id, String tool, String job) {
         PipelineResponse(CiPipeline pipeline) {
             this(pipeline.id(), pipeline.tool(), pipeline.job());

@@ -51,10 +51,10 @@ class BitbucketCodeServiceTests {
 
     @Test
     void repoNeverShowsItsTokenAsText() {
-        assertThat(codeService.repos().getFirst().toString())
+        assertThat(codeService.listRepos().getFirst().toString())
                 .doesNotContain("sample-app-token")
                 .contains("token=(set)");
-        assertThat(codeService.repos().get(1).toString()).contains("token=(none)");
+        assertThat(codeService.listRepos().get(1).toString()).contains("token=(none)");
     }
 
     @Test

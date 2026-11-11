@@ -23,13 +23,15 @@ public class BitbucketCodeService {
     private final CodeProperties properties;
 
     /**
-     * The configured repos, in config order.
+     * Return the configured repos in config order.
      */
-    public List<CodeRepo> repos() {
+    public List<CodeRepo> listRepos() {
         return properties.repos();
     }
 
     /**
+     * Lists out the branches of this repoId.
+     *
      * @param repoId repo identifier
      * @throws RepoNotFoundException when no configured repo identifier has that id
      */
@@ -39,6 +41,8 @@ public class BitbucketCodeService {
     }
 
     /**
+     * Lists out the commits of this branch under this repoId.
+     *
      * @param repoId repo identifier
      * @throws RepoNotFoundException when no configured repo has that id
      */

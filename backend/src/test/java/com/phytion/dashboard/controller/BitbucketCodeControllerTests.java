@@ -45,7 +45,7 @@ class BitbucketCodeControllerTests {
     @Test
     @WithMockUser
     void listReposReturnsIdToolAndRepo() throws Exception {
-        when(codeService.repos()).thenReturn(List.of(new CodeRepo("bitbucket", "andy-test-app", "sample-app", null)));
+        when(codeService.listRepos()).thenReturn(List.of(new CodeRepo("bitbucket", "andy-test-app", "sample-app", null)));
 
         mvc.perform(get("/api/code/repos"))
                 .andExpect(status().isOk())

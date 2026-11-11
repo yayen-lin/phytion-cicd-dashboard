@@ -21,9 +21,6 @@ public record CodeRepo(String tool, String workspace, String name, String token)
         return token != null && !token.isBlank();
     }
 
-    /**
-     * Without the token itself, so it can't end up in a log
-     */
     @Override
     public String toString() {
         return "CodeRepo[tool=" + tool
