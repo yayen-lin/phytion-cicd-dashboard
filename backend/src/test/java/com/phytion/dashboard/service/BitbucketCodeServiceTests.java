@@ -28,15 +28,15 @@ class BitbucketCodeServiceTests {
     void setUp() {
         code = mock(BitbucketAdapter.class);
         codeService = new BitbucketCodeService(code, new CodeProperties(List.of(
-                new CodeRepo("bitbucket", "andy-test-app/sample-app", "sample-app-token"),
-                new CodeRepo("bitbucket", "andy-test-app/dummy-app", " "))));
+                new CodeRepo("bitbucket", "andy-test-app", "sample-app", "sample-app-token"),
+                new CodeRepo("bitbucket", "andy-test-app", "dummy-app", " "))));
     }
 
     @Test
     void createTagUsesTheReposToken() {
         codeService.createTag("bitbucket:andy-test-app/sample-app", "v1.4.0", "a4dad00");
 
-        verify(code).createTag("andy-test-app/sample-app", "sample-app-token", "v1.4.0", "a4dad00");
+        verify(code).createTag("andy-test-app", "sample-app", "sample-app-token", "v1.4.0", "a4dad00");
     }
 
     @Test
@@ -59,27 +59,27 @@ class BitbucketCodeServiceTests {
 
     @Test
     void listBranchesAsksTheToolForTheRepo() {
-        when(code.listBranches("andy-test-app/sample-app")).thenReturn(List.of());
+        when(code.listBranches("andy-test-app", "sample-app")).thenReturn(List.of());
 
         assertThat(codeService.listBranches("bitbucket:andy-test-app/sample-app")).isEmpty();
 
-        verify(code).listBranches("andy-test-app/sample-app");
+        verify(code).listBranches("andy-test-app", "sample-app");
     }
 
     @Test
     void listCommitsAsksTheToolForTheRepoAndBranch() {
-        when(code.listCommits("andy-test-app/sample-app", "main")).thenReturn(List.of());
+        when(code.listCommits("andy-test-app", "sample-app", "main")).thenReturn(List.of());
 
         assertThat(codeService.listCommits("bitbucket:andy-test-app/sample-app", "main")).isEmpty();
 
-        verify(code).listCommits("andy-test-app/sample-app", "main");
+        verify(code).listCommits("andy-test-app", "sample-app", "main");
     }
 
     @Test
-    void commitUrlAsksTheToolForTheRepoAndCommit() {
-        when(code.commitUrl("andy-test-app/sample-app", "a4dad00")).thenReturn("https://bitbucket.org/x");
+    void commitUrlAsksTheToolForTheRepoAndGetCommit() {
+        when(code.getCommitUrl("andy-test-app", "sample-app", "a4dad00")).thenReturn("https://bitbucket.org/x");
 
-        assertThat(codeService.commitUrl("bitbucket:andy-test-app/sample-app", "a4dad00"))
+        assertThat(codeService.getCommitUrl("bitbucket:andy-test-app/sample-app", "a4dad00"))
                 .isEqualTo("https://bitbucket.org/x");
     }
 
@@ -89,27 +89,9 @@ class BitbucketCodeServiceTests {
                 .isInstanceOf(RepoNotFoundException.class);
         assertThatThrownBy(() -> codeService.listCommits("bitbucket:andy-test-app/other-app", "main"))
                 .isInstanceOf(RepoNotFoundException.class);
-        assertThatThrownBy(() -> codeService.commitUrl("bitbucket:andy-test-app/other-app", "a4dad00"))
+        assertThatThrownBy(() -> codeService.getCommitUrl("bitbucket:andy-test-app/other-app", "a4dad00"))
                 .isInstanceOf(RepoNotFoundException.class);
         assertThatThrownBy(() -> codeService.createTag("bitbucket:andy-test-app/other-app", "v1.4.0", "a4dad00"))
                 .isInstanceOf(RepoNotFoundException.class);
-    }
-
-    @Test
-    void repoOnAToolWithoutAdapterFailsAtStartup() {
-        CodeProperties properties = new CodeProperties(List.of(new CodeRepo("github", "phytion/some-app", null)));
-
-        assertThatThrownBy(() -> new BitbucketCodeService(code, properties))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("github");
-    }
-
-    @Test
-    void repoWithoutWorkspaceFailsAtStartup() {
-        CodeProperties properties = new CodeProperties(List.of(new CodeRepo("bitbucket", "sample-app", null)));
-
-        assertThatThrownBy(() -> new BitbucketCodeService(code, properties))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("workspace/repo");
     }
 }

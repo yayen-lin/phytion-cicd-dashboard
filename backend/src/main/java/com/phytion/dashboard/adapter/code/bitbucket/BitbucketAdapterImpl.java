@@ -20,37 +20,31 @@ import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Code adapter for Bitbucket Cloud
- */
 @Component
 public class BitbucketAdapterImpl implements BitbucketAdapter {
 
-    // Reads Bitbucket's error answers, which come with the HTTP error rather than through RestClient
-    private static final JsonMapper JSON = JsonMapper.builder().build();
-
-    private final RestClient bitbucket;
+    private final RestClient client;
     private final BitbucketProperties properties;
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     @Autowired
     public BitbucketAdapterImpl(BitbucketProperties properties) {
         this(RestClient.builder().baseUrl(properties.url()).build(), properties);
     }
 
-    // For tests, which pass a RestClient wired to a fake Bitbucket
-    BitbucketAdapterImpl(RestClient bitbucket, BitbucketProperties properties) {
-        this.bitbucket = bitbucket;
+    // constructor for test
+    BitbucketAdapterImpl(RestClient client, BitbucketProperties properties) {
+        this.client = client;
         this.properties = properties;
     }
 
     @Override
-    public List<CodeBranch> listBranches(String repo) {
-        String[] parts = split(repo);
+    public List<CodeBranch> listBranches(String workspace, String name) {
         return call(() -> {
-            BitbucketJson.Page<BitbucketJson.Branch> page = bitbucket.get()
+            BitbucketJson.Page<BitbucketJson.Branch> page = client.get()
                     // sort=-target.date: the branch with the newest commit first
                     .uri("/repositories/{workspace}/{repo}/refs/branches?sort=-target.date&pagelen={max}",
-                            parts[0], parts[1], properties.maxBranches())
+                            workspace, name, properties.maxBranches())
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {
                     });
@@ -61,13 +55,11 @@ public class BitbucketAdapterImpl implements BitbucketAdapter {
     }
 
     @Override
-    public List<CodeCommit> listCommits(String repo, String branch) {
-        String[] parts = split(repo);
+    public List<CodeCommit> listCommits(String workspace, String name, String branch) {
         return call(() -> {
-            BitbucketJson.Page<BitbucketJson.Commit> page = bitbucket.get()
-                    // include={branch} instead of /commits/{branch} in the path: branch names may contain "/"
+            BitbucketJson.Page<BitbucketJson.Commit> page = client.get()
                     .uri("/repositories/{workspace}/{repo}/commits?include={branch}&pagelen={max}",
-                            parts[0], parts[1], branch, properties.maxCommits())
+                            workspace, name, branch, properties.maxCommits())
                     .retrieve()
                     .body(new ParameterizedTypeReference<>() {
                     });
@@ -76,36 +68,34 @@ public class BitbucketAdapterImpl implements BitbucketAdapter {
     }
 
     @Override
-    public String commitUrl(String repo, String hash) {
-        String[] parts = split(repo);
-        // The same address Bitbucket gives as a commit's links.html.href
+    public String getCommitUrl(String workspace, String name, String commitHash) {
         return UriComponentsBuilder.fromUriString(properties.webUrl())
-                .pathSegment(parts[0], parts[1], "commits", hash)
+                .pathSegment(workspace, name, "commits", commitHash)
                 .encode()
                 .toUriString();
     }
 
     @Override
-    public void createTag(String repo, String token, String name, String hash) {
-        String[] parts = split(repo);
+    public void createTag(String workspace, String name, String token, String tag, String commitHash) {
         call(() -> {
             try {
-                bitbucket.post()
-                        .uri("/repositories/{workspace}/{repo}/refs/tags", parts[0], parts[1])
-                        // Only this request sends a token: reading the repos is anonymous
+                client.post()
+                        .uri("/repositories/{workspace}/{repo}/refs/tags", workspace, name)
                         .headers(headers -> headers.setBearerAuth(token))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .body(new BitbucketJson.NewTag(name, new BitbucketJson.NewTagTarget(hash)))
+                        .body(new BitbucketJson.NewTag(tag, new BitbucketJson.NewTagTarget(commitHash)))
                         .retrieve()
                         .toBodilessEntity();
                 return null;
             } catch (HttpClientErrorException e) {
-                throw new CodeToolException(tagRefused(repo, e), e);
+                throw new CodeToolException(tagRefused(workspace + "/" + name, e), e);
             }
         });
     }
 
-    /** Why Bitbucket refused to create a tag, in words the dashboard can show */
+    /**
+     * Why Bitbucket refused to create a tag
+     */
     private static String tagRefused(String repo, HttpClientErrorException e) {
         return switch (e.getStatusCode().value()) {
             // e.g. the tag already exists, or there's no such commit
@@ -119,8 +109,7 @@ public class BitbucketAdapterImpl implements BitbucketAdapter {
     }
 
     /**
-     * Bitbucket's message, with what was wrong with which field when it says, e.g. "Tag "v1.4.0" already exists" or
-     * "Bad request (target.hash: ambiguous or non-existent hash)"
+     * Bitbucket's error message with what was wrong with which field
      */
     private static String errorReason(HttpClientErrorException e) {
         BitbucketJson.ErrorDetails error;
@@ -140,15 +129,6 @@ public class BitbucketAdapterImpl implements BitbucketAdapter {
         return error.fields().entrySet().stream()
                 .map(field -> field.getKey() + ": " + field.getValue())
                 .collect(Collectors.joining(", ", error.message() + " (", ")"));
-    }
-
-    /** "andy-test-app/sample-app" -> ["andy-test-app", "sample-app"], as separate path parts so "/" isn't encoded */
-    private static String[] split(String repo) {
-        String[] parts = repo.split("/", 2);
-        if (parts.length != 2) {
-            throw new IllegalArgumentException("Repo must be workspace/repo, got: " + repo);
-        }
-        return parts;
     }
 
     /**
@@ -182,7 +162,9 @@ public class BitbucketAdapterImpl implements BitbucketAdapter {
                 href(commit.links()));
     }
 
-    /** The Bitbucket user's name, else the git author without the email: "Andy Lin <andy@example.com>" -> "Andy Lin" */
+    /**
+     * The Bitbucket user's name, else the git author without the email
+     */
     private static String author(BitbucketJson.Author author) {
         if (author == null) {
             return null;

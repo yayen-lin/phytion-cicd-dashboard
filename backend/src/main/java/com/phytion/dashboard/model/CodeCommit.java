@@ -3,7 +3,7 @@ package com.phytion.dashboard.model;
 import java.time.Instant;
 
 /**
- * One commit in a repo
+ * One commit
  *
  * @param hash        the full commit hash
  * @param message     the full commit message

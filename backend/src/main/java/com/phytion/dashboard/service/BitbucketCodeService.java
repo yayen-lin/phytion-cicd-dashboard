@@ -8,6 +8,7 @@ import com.phytion.dashboard.config.CodeProperties;
 import com.phytion.dashboard.model.CodeBranch;
 import com.phytion.dashboard.model.CodeCommit;
 import com.phytion.dashboard.model.CodeRepo;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
@@ -15,82 +16,69 @@ import org.springframework.stereotype.Service;
  * here: the action that creates it (a release) records itself.
  */
 @Service
+@RequiredArgsConstructor
 public class BitbucketCodeService {
 
-    private static final String BITBUCKET = "bitbucket";
-
     private final BitbucketAdapter code;
-    private final List<CodeRepo> repos;
+    private final CodeProperties properties;
 
-    public BitbucketCodeService(BitbucketAdapter code, CodeProperties properties) {
-        // Fail at startup rather than on the first request
-        for (CodeRepo repo : properties.repos()) {
-            // Bitbucket is the only code tool with an adapter so far
-            if (!BITBUCKET.equals(repo.tool())) {
-                throw new IllegalStateException("No adapter for code tool '" + repo.tool()
-                        + "' (repo " + repo.id() + "); only 'bitbucket' is supported");
-            }
-            if (repo.repo() == null || !repo.repo().matches("[^/]+/[^/]+")) {
-                throw new IllegalStateException("Repo '" + repo.repo() + "' must be workspace/repo, "
-                        + "e.g. andy-test-app/sample-app");
-            }
-        }
-        this.code = code;
-        this.repos = properties.repos();
-    }
-
-    /** The configured repos, in config order. */
+    /**
+     * The configured repos, in config order.
+     */
     public List<CodeRepo> repos() {
-        return repos;
+        return properties.repos();
     }
 
     /**
-     * @param repoId e.g. "bitbucket:andy-test-app/sample-app"
-     * @throws RepoNotFoundException when no configured repo has that id
+     * @param repoId repo identifier
+     * @throws RepoNotFoundException when no configured repo identifier has that id
      */
     public List<CodeBranch> listBranches(String repoId) {
-        return code.listBranches(repo(repoId).repo());
+        CodeRepo repo = repo(repoId);
+        return code.listBranches(repo.workspace(), repo.name());
     }
 
     /**
-     * @param repoId e.g. "bitbucket:andy-test-app/sample-app"
+     * @param repoId repo identifier
      * @throws RepoNotFoundException when no configured repo has that id
      */
     public List<CodeCommit> listCommits(String repoId, String branch) {
-        return code.listCommits(repo(repoId).repo(), branch);
+        CodeRepo repo = repo(repoId);
+        return code.listCommits(repo.workspace(), repo.name(), branch);
     }
 
     /**
      * The address of a commit's page in the code tool.
      *
-     * @param repoId e.g. "bitbucket:andy-test-app/sample-app"
-     * @param hash   the commit's full hash
+     * @param repoId     repo identifier
+     * @param commitHash full commit hash
      * @throws RepoNotFoundException when no configured repo has that id
      */
-    public String commitUrl(String repoId, String hash) {
-        return code.commitUrl(repo(repoId).repo(), hash);
+    public String getCommitUrl(String repoId, String commitHash) {
+        CodeRepo repo = repo(repoId);
+        return code.getCommitUrl(repo.workspace(), repo.name(), commitHash);
     }
 
     /**
      * Creates a tag on a commit, with the repo's token.
      *
-     * @param repoId e.g. "bitbucket:andy-test-app/sample-app"
-     * @param name   the tag, e.g. "v1.4.0"
-     * @param hash   the commit's full hash
-     * @throws RepoNotFoundException when no configured repo has that id
-     * @throws CodeToolException     when the repo has no token, or the code tool refuses (e.g. the tag already exists)
+     * @param repoId     repo identifier
+     * @param tag        version tag
+     * @param commitHash full commit hash
+     * @throws RepoNotFoundException when no configured repo identifier has that id
+     * @throws CodeToolException     when the repo identifier has no token, or request getting refused
      */
-    public void createTag(String repoId, String name, String hash) {
+    public void createTag(String repoId, String tag, String commitHash) {
         CodeRepo repo = repo(repoId);
         if (!repo.hasToken()) {
             throw new CodeToolException("No token is set for " + repo.id()
                     + ", so the dashboard can't create tags there");
         }
-        code.createTag(repo.repo(), repo.token(), name, hash);
+        code.createTag(repo.workspace(), repo.name(), repo.token(), tag, commitHash);
     }
 
     private CodeRepo repo(String repoId) {
-        return repos.stream()
+        return properties.repos().stream()
                 .filter(repo -> repo.id().equals(repoId))
                 .findFirst()
                 .orElseThrow(() -> new RepoNotFoundException(repoId));

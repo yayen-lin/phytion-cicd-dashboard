@@ -60,7 +60,7 @@ class BitbucketAdapterImplTests {
                         ]}
                         """, MediaType.APPLICATION_JSON));
 
-        assertThat(adapter.listBranches("andy-test-app/sample-app")).containsExactly(new CodeBranch(
+        assertThat(adapter.listBranches("andy-test-app", "sample-app")).containsExactly(new CodeBranch(
                 "main",
                 new CodeCommit("cc99f6b852396cb487275a77c5f008e6077bdd0b", "sample app initial commit\n",
                         "Andy Lin", Instant.parse("2026-11-03T22:11:13Z"),
@@ -81,7 +81,7 @@ class BitbucketAdapterImplTests {
                         ]}
                         """, MediaType.APPLICATION_JSON));
 
-        assertThat(adapter.listCommits("andy-test-app/sample-app", "feature/login")).containsExactly(
+        assertThat(adapter.listCommits("andy-test-app", "sample-app", "feature/login")).containsExactly(
                 // No Bitbucket account for this author: the git name without the email
                 new CodeCommit("aaa111", "Add login", "Someone Else", Instant.parse("2026-11-04T08:00:00Z"),
                         "https://bitbucket.org/andy-test-app/sample-app/commits/aaa111"));
@@ -94,7 +94,7 @@ class BitbucketAdapterImplTests {
                         "http://bitbucket/repositories/andy-test-app/sample-app/refs/branches?sort=-target.date&pagelen=50"))
                 .andRespond(withSuccess("{\"values\": []}", MediaType.APPLICATION_JSON));
 
-        assertThat(adapter.listBranches("andy-test-app/sample-app")).isEmpty();
+        assertThat(adapter.listBranches("andy-test-app", "sample-app")).isEmpty();
     }
 
     @Test
@@ -103,15 +103,15 @@ class BitbucketAdapterImplTests {
                         "http://bitbucket/repositories/andy-test-app/gone/refs/branches?sort=-target.date&pagelen=50"))
                 .andRespond(withResourceNotFound());
 
-        assertThatThrownBy(() -> adapter.listBranches("andy-test-app/gone"))
+        assertThatThrownBy(() -> adapter.listBranches("andy-test-app", "gone"))
                 .isInstanceOf(CodeToolException.class)
                 .hasMessage("Bitbucket answered 404 Not Found");
     }
 
     @Test
-    void commitUrlIsTheCommitsPageOnTheWebsiteNotTheApi() {
+    void getCommitUrlIsTheCommitsPageOnTheWebsiteNotTheApi() {
         // The same address as the commit's links.html.href in Bitbucket's answers
-        assertThat(adapter.commitUrl("andy-test-app/sample-app", COMMIT))
+        assertThat(adapter.getCommitUrl("andy-test-app", "sample-app", COMMIT))
                 .isEqualTo("https://bitbucket.org/andy-test-app/sample-app/commits/" + COMMIT);
         // Building it doesn't ask Bitbucket
         bitbucket.verify();
@@ -124,7 +124,7 @@ class BitbucketAdapterImplTests {
                 .andExpect(headerDoesNotExist("Authorization"))
                 .andRespond(withSuccess("{\"values\": []}", MediaType.APPLICATION_JSON));
 
-        adapter.listBranches("andy-test-app/sample-app");
+        adapter.listBranches("andy-test-app", "sample-app");
         bitbucket.verify();
     }
 
@@ -137,7 +137,7 @@ class BitbucketAdapterImplTests {
                 .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON)
                         .body("{\"name\": \"v1.4.0\", \"type\": \"tag\", \"target\": {\"hash\": \"" + COMMIT + "\"}}"));
 
-        adapter.createTag("andy-test-app/sample-app", "repo-token", "v1.4.0", COMMIT);
+        adapter.createTag("andy-test-app", "sample-app", "repo-token", "v1.4.0", COMMIT);
         bitbucket.verify();
     }
 
@@ -148,7 +148,7 @@ class BitbucketAdapterImplTests {
                  "data": {"key": "INVALID_TAG_NAME"}}, "data": {"key": "INVALID_TAG_NAME"}}
                 """);
 
-        assertThatThrownBy(() -> adapter.createTag("andy-test-app/sample-app", "repo-token", "v0.1.1", COMMIT))
+        assertThatThrownBy(() -> adapter.createTag("andy-test-app", "sample-app", "repo-token", "v0.1.1", COMMIT))
                 .isInstanceOf(CodeToolException.class)
                 .hasMessage("Bitbucket refused the tag: Tag \"v0.1.1\" already exists");
     }
@@ -160,7 +160,7 @@ class BitbucketAdapterImplTests {
                  "fields": {"target.hash": "ambiguous or non-existent hash"}}}
                 """);
 
-        assertThatThrownBy(() -> adapter.createTag("andy-test-app/sample-app", "repo-token", "v1.4.0", "0000000"))
+        assertThatThrownBy(() -> adapter.createTag("andy-test-app", "sample-app", "repo-token", "v1.4.0", "0000000"))
                 .isInstanceOf(CodeToolException.class)
                 .hasMessage("Bitbucket refused the tag: Bad request (target.hash: ambiguous or non-existent hash)");
     }
@@ -169,7 +169,7 @@ class BitbucketAdapterImplTests {
     void refusalWithoutBitbucketsErrorJsonGivesTheStatus() {
         expectTagRefused(HttpStatus.BAD_REQUEST, "<html>Bad request</html>");
 
-        assertThatThrownBy(() -> adapter.createTag("andy-test-app/sample-app", "repo-token", "v1.4.0", COMMIT))
+        assertThatThrownBy(() -> adapter.createTag("andy-test-app", "sample-app", "repo-token", "v1.4.0", COMMIT))
                 .isInstanceOf(CodeToolException.class)
                 .hasMessage("Bitbucket refused the tag: 400 Bad Request");
     }
@@ -180,7 +180,7 @@ class BitbucketAdapterImplTests {
                 {"type": "error", "error": {"message": "Token is invalid, expired, or not supported for this endpoint."}}
                 """);
 
-        assertThatThrownBy(() -> adapter.createTag("andy-test-app/sample-app", "expired", "v1.4.0", COMMIT))
+        assertThatThrownBy(() -> adapter.createTag("andy-test-app", "sample-app", "expired", "v1.4.0", COMMIT))
                 .isInstanceOf(CodeToolException.class)
                 .hasMessage("Bitbucket rejected the token for andy-test-app/sample-app (invalid or expired)");
     }
@@ -191,7 +191,7 @@ class BitbucketAdapterImplTests {
         expectTagRefused(HttpStatus.NOT_FOUND,
                 "{\"type\": \"error\", \"error\": {\"message\": \"You may not have access to this repository\"}}");
 
-        assertThatThrownBy(() -> adapter.createTag("andy-test-app/sample-app", "dummy-app-token", "v1.4.0", COMMIT))
+        assertThatThrownBy(() -> adapter.createTag("andy-test-app", "sample-app", "dummy-app-token", "v1.4.0", COMMIT))
                 .isInstanceOf(CodeToolException.class)
                 .hasMessage("Bitbucket didn't find andy-test-app/sample-app with its token (is it that repo's token?)");
     }
@@ -200,7 +200,7 @@ class BitbucketAdapterImplTests {
     void bitbucketDownWhileTaggingGivesJustTheStatus() {
         bitbucket.expect(requestTo(TAGS)).andRespond(withServerError());
 
-        assertThatThrownBy(() -> adapter.createTag("andy-test-app/sample-app", "repo-token", "v1.4.0", COMMIT))
+        assertThatThrownBy(() -> adapter.createTag("andy-test-app", "sample-app", "repo-token", "v1.4.0", COMMIT))
                 .isInstanceOf(CodeToolException.class)
                 .hasMessage("Bitbucket answered 500 Internal Server Error");
     }

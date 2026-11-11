@@ -24,7 +24,7 @@ class AuditServiceTests {
         AuditEntryRepository entries = mock(AuditEntryRepository.class);
         // save() returns what it was given, like the real repository does
         when(entries.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        auditService = new AuditService(entries, 50);
+        auditService = new AuditService(entries, 50, 1000);
     }
 
     @Test

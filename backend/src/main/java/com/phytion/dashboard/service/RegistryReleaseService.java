@@ -161,7 +161,7 @@ public class RegistryReleaseService {
     private ReleaseVersion toVersion(ReleaseApp app, String tag, Map<String, String> labels) {
         String commit = labels.get(LABEL_COMMIT);
         return new ReleaseVersion(tag, labels.get(LABEL_BUILD), commit,
-                commit == null ? null : code.commitUrl(app.repo(), commit), instant(labels.get(LABEL_CREATED)));
+                commit == null ? null : code.getCommitUrl(app.repo(), commit), instant(labels.get(LABEL_CREATED)));
     }
 
     /** "2026-11-06T18:16:33Z" -> that instant; null when missing or not a date */

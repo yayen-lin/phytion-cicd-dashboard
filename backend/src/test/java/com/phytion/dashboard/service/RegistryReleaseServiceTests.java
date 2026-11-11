@@ -41,7 +41,7 @@ class RegistryReleaseServiceTests {
     private static final String COMMIT = "a4dad009a1f3ef48f7239a3dd155c64ca51d466f";
     private static final String COMMIT_URL = "https://bitbucket.org/andy-test-app/sample-app/commits/" + COMMIT;
     private static final CodeProperties CODE_REPOS =
-            new CodeProperties(List.of(new CodeRepo("bitbucket", "andy-test-app/sample-app", null)));
+            new CodeProperties(List.of(new CodeRepo("bitbucket", "andy-test-app", "sample-app", null)));
     private static final CiProperties CI_PIPELINES =
             new CiProperties(List.of(new CiPipeline("jenkins", "sample-app")));
     private static final ReleaseProperties APPS = new ReleaseProperties(List.of(
@@ -60,7 +60,7 @@ class RegistryReleaseServiceTests {
         code = mock(BitbucketCodeService.class);
         ci = mock(JenkinsCiService.class);
         audit = mock(AuditService.class);
-        when(code.commitUrl(REPO, COMMIT)).thenReturn(COMMIT_URL);
+        when(code.getCommitUrl(REPO, COMMIT)).thenReturn(COMMIT_URL);
         releaseService = service(APPS, 20);
     }
 
@@ -166,7 +166,7 @@ class RegistryReleaseServiceTests {
 
         assertThat(releaseService.listVersions(APP))
                 .containsExactly(new ReleaseVersion("0.1.0", null, null, null, null));
-        verify(code, never()).commitUrl(anyString(), anyString());
+        verify(code, never()).getCommitUrl(anyString(), anyString());
     }
 
     @Test

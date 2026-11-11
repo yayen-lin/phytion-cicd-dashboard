@@ -3,25 +3,33 @@ package com.phytion.dashboard.model;
 /**
  * A code repo the dashboard shows, and the tool that hosts it. Configured in application.properties.
  *
- * @param tool  which code tool hosts the repo, e.g. "bitbucket"
- * @param repo  the repo's name in that tool, e.g. "andy-test-app/sample-app" (workspace/repo)
- * @param token an access token for this repo with write access, used to create tags (releases); null or blank when
- *              none is set. Reading the repo doesn't use it: the repos are public
+ * @param tool      the external tool that hosts the repo
+ * @param workspace the workspace the repo is in
+ * @param name      the name of the repo in that workspace
+ * @param token     an access token to this repo with write permission for creating a tag
  */
-public record CodeRepo(String tool, String repo, String token) {
+public record CodeRepo(String tool, String workspace, String name, String token) {
 
-    /** e.g. "bitbucket:andy-test-app/sample-app": how the API refers to the repo */
+    /**
+     * In the form the API refers to the repo
+     */
     public String id() {
-        return tool + ":" + repo;
+        return tool + ":" + workspace + "/" + name;
     }
 
     public boolean hasToken() {
         return token != null && !token.isBlank();
     }
 
-    /** Without the token itself, so it can't end up in a log */
+    /**
+     * Without the token itself, so it can't end up in a log
+     */
     @Override
     public String toString() {
-        return "CodeRepo[tool=" + tool + ", repo=" + repo + ", token=" + (hasToken() ? "(set)" : "(none)") + "]";
+        return "CodeRepo[tool=" + tool
+                + ", workspace=" + workspace
+                + ", name=" + name
+                + ", token=" + (hasToken() ? "(set)" : "(none)")
+                + "]";
     }
 }

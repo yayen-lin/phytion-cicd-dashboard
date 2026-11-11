@@ -25,22 +25,25 @@ public class BitbucketCodeController {
         return codeService.repos().stream().map(RepoResponse::new).toList();
     }
 
-    /** @param repo e.g. "bitbucket:andy-test-app/sample-app" */
+    /**
+     * @param repoId repo identifier
+     */
     @GetMapping("/api/code/branches")
-    public BranchesResponse listBranches(@RequestParam String repo) {
-        return new BranchesResponse(repo, codeService.listBranches(repo));
+    public BranchesResponse listBranches(@RequestParam String repoId) {
+        return new BranchesResponse(repoId, codeService.listBranches(repoId));
     }
 
-    /** @param repo e.g. "bitbucket:andy-test-app/sample-app" */
+    /**
+     * @param repoId repo identifier
+     */
     @GetMapping("/api/code/commits")
-    public CommitsResponse listCommits(@RequestParam String repo, @RequestParam String branch) {
-        return new CommitsResponse(repo, branch, codeService.listCommits(repo, branch));
+    public CommitsResponse listCommits(@RequestParam String repoId, @RequestParam String branch) {
+        return new CommitsResponse(repoId, branch, codeService.listCommits(repoId, branch));
     }
 
-    /** @param id e.g. "bitbucket:andy-test-app/sample-app" */
-    public record RepoResponse(String id, String tool, String repo) {
+    public record RepoResponse(String id, String tool, String workspace, String name) {
         RepoResponse(CodeRepo repo) {
-            this(repo.id(), repo.tool(), repo.repo());
+            this(repo.id(), repo.tool(), repo.workspace(), repo.name());
         }
     }
 

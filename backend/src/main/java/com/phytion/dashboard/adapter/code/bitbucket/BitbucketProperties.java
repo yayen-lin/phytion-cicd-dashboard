@@ -3,10 +3,10 @@ package com.phytion.dashboard.adapter.code.bitbucket;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Bitbucket settings. No credentials yet: the repos are public, so the dashboard reads them anonymously.
+ * Bitbucket settings.
  *
- * @param url         Bitbucket's REST API, e.g. https://api.bitbucket.org/2.0
- * @param webUrl      Bitbucket's website, for links to its pages, e.g. https://bitbucket.org
+ * @param url         Bitbucket's REST API
+ * @param webUrl      Bitbucket's web link
  * @param maxBranches how many branches listBranches returns (Bitbucket allows at most 100)
  * @param maxCommits  how many recent commits listCommits returns (Bitbucket allows at most 100)
  */
