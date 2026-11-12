@@ -1,4 +1,4 @@
-package com.phytion.dashboard.adapter.release.registry;
+package com.phytion.dashboard.adapter.release.dockerregistry;
 
 import java.util.List;
 import java.util.Map;
@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * Docker registry implementation (the Docker Registry HTTP API v2). Read-only.
  */
-public interface RegistryAdapter {
+public interface DockerRegistryAdapter {
 
     /**
      * The tags of an image, in the registry's order (not by version).

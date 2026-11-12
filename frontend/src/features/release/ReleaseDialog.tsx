@@ -15,14 +15,16 @@ import {Label} from '@/components/ui/label'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Skeleton} from '@/components/ui/skeleton'
 import {getCommits, type CodeCommit} from '@/api/code'
-import {release, RELEASE_VERSION, type ReleaseApp} from '@/api/release'
+import type {App} from '@/api/apps'
+import {release, RELEASE_VERSION} from '@/api/release'
 import {firstLine} from '@/lib/format'
 
 // Releases are made from main (see PLAN.md: any commit on main can be released)
 const BRANCH = 'main'
 
 type Props = {
-  app: ReleaseApp
+  /** An app that is released */
+  app: App
   open: boolean
   onOpenChange: (open: boolean) => void
   /** After a release was made: its version and the tag build's id (null when the build is still queued) */
@@ -40,14 +42,14 @@ function ReleaseForm({app, onReleased}: Pick<Props, 'app' | 'onReleased'>) {
   const [releaseError, setReleaseError] = useState('')
 
   useEffect(() => {
-    getCommits(app.repo, BRANCH)
+    getCommits(app.id, BRANCH)
       .then((data) => {
         setCommits(data.commits)
         // The newest commit, the one usually released
         setCommit(data.commits[0]?.hash ?? '')
       })
       .catch(() => setLoadError(`Could not load the commits on ${BRANCH}`))
-  }, [app.repo])
+  }, [app.id])
 
   const versionValid = RELEASE_VERSION.test(version)
   const canRelease = versionValid && commit !== '' && !releasing
@@ -69,7 +71,7 @@ function ReleaseForm({app, onReleased}: Pick<Props, 'app' | 'onReleased'>) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <DialogHeader>
-        <DialogTitle className="text-lg">Release {app.image}</DialogTitle>
+        <DialogTitle className="text-lg">Release {app.id}</DialogTitle>
         <DialogDescription>
           Tags a commit on {BRANCH} with the version and builds it. If its tests pass, the build pushes the image.
         </DialogDescription>
@@ -117,7 +119,7 @@ function ReleaseForm({app, onReleased}: Pick<Props, 'app' | 'onReleased'>) {
           {version !== '' && !versionValid
             ? <span className="text-destructive">A version looks like v1.4.0</span>
             : versionValid
-              ? <>The image will be <code className="font-mono">{app.image}:{version.slice(1)}</code></>
+              ? <>The image will be <code className="font-mono">{app.release?.image}:{version.slice(1)}</code></>
               : 'The git tag to create, e.g. v1.4.0'}
         </p>
       </div>

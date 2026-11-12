@@ -14,10 +14,9 @@ export type AuditEntry = {
   details: string | null
 }
 
-/** Which entries to show; a field left out matches every entry */
 export type AuditFilter = {
-  target?: string // e.g. "jenkins:sample-app"
-  actionType?: string // e.g. "TRIGGER_BUILD"
+  target?: string
+  actionType?: string
   username?: string
   actionResult?: AuditActionResult
 }

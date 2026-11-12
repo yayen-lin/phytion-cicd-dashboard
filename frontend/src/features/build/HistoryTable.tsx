@@ -10,12 +10,12 @@ import AuditTable from '@/features/history/AuditTable'
 import BuildDetailsDialog from './BuildDetailsDialog'
 
 type Props = {
-  /** Only actions on this pipeline, e.g. "jenkins:sample-app" */
-  pipeline: string
+  /** Only builds started on this app, e.g. "sample-app" */
+  appId: string
 }
 
-/** The actions taken on one pipeline through the dashboard, newest first: who did what, and when. */
-function HistoryTable({pipeline}: Props) {
+/** The builds started on one app's pipeline through the dashboard, newest first: who did it, and when. */
+function HistoryTable({appId}: Props) {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null)
   const [error, setError] = useState('')
   // The CI builds, to show the status of the build each entry started
@@ -26,18 +26,19 @@ function HistoryTable({pipeline}: Props) {
 
   const loadHistory = useCallback(() => {
     return Promise.all([
-      getAuditLog({target: pipeline})
+      // Only "Run build": releases also start builds, but they show on the Release stage
+      getAuditLog({target: appId, actionType: 'TRIGGER_BUILD'})
         .then((log) => {
           setEntries(log)
           setError('')
         })
         .catch(() => setError('Could not load the audit log')),
       // Only for the build status column: if the CI tool is down, that column shows "-"
-      getBuilds(pipeline)
+      getBuilds(appId)
         .then((data) => setBuilds(data.builds))
         .catch(() => setBuilds([])),
     ])
-  }, [pipeline])
+  }, [appId])
 
   useEffect(() => {
     loadHistory()
@@ -83,7 +84,7 @@ function HistoryTable({pipeline}: Props) {
           />
         )}
       </CardContent>
-      <BuildDetailsDialog pipeline={pipeline} buildId={selectedId} onClose={() => setSelectedId(null)}/>
+      <BuildDetailsDialog appId={appId} buildId={selectedId} onClose={() => setSelectedId(null)}/>
     </Card>
   )
 }

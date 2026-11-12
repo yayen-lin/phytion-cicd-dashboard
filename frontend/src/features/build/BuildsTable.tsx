@@ -13,12 +13,12 @@ import TestCounts from './TestCounts'
 import {formatDuration} from '@/lib/format'
 
 type Props = {
-  /** e.g. "jenkins:sample-app" */
-  pipeline: string
+  /** e.g. "sample-app" */
+  appId: string
 }
 
-/** The builds of a pipeline, newest first, with a button to start a new one. */
-function BuildsTable({pipeline}: Props) {
+/** The builds of an app's pipeline, newest first, with a button to start a new one. */
+function BuildsTable({appId}: Props) {
   // null while loading
   const [data, setData] = useState<CiBuilds | null>(null)
   const [error, setError] = useState('')
@@ -28,13 +28,13 @@ function BuildsTable({pipeline}: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const loadBuilds = useCallback(() => {
-    return getBuilds(pipeline)
+    return getBuilds(appId)
       .then((builds) => {
         setData(builds)
         setError('')
       })
       .catch(() => setError('Could not load builds from the CI tool'))
-  }, [pipeline])
+  }, [appId])
 
   useEffect(() => {
     loadBuilds()
@@ -50,7 +50,7 @@ function BuildsTable({pipeline}: Props) {
   async function handleRunBuild() {
     setTriggering(true)
     try {
-      const buildId = await triggerBuild(pipeline)
+      const buildId = await triggerBuild(appId)
       if (buildId) toast.success(`Started build #${buildId}`)
       else toast.info('Build queued, but the CI tool has not started it yet')
     } catch {
@@ -148,7 +148,7 @@ function BuildsTable({pipeline}: Props) {
           </Table>
         )}
       </CardContent>
-      <BuildDetailsDialog pipeline={pipeline} buildId={selectedId} onClose={() => setSelectedId(null)}/>
+      <BuildDetailsDialog appId={appId} buildId={selectedId} onClose={() => setSelectedId(null)}/>
     </Card>
   )
 }

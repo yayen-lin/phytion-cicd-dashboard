@@ -10,25 +10,23 @@ import CommitLink from './CommitLink'
 import {firstLine} from '@/lib/format'
 
 type Props = {
-  /** e.g. "bitbucket:andy-test-app/sample-app" */
-  repo: string
+  appId: string
 }
 
-/** The branches of a repo, the most recently committed to first. */
-function BranchesTable({repo}: Props) {
+function BranchesTable({appId}: Props) {
   // null while loading
   const [branches, setBranches] = useState<CodeBranch[] | null>(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
 
   const loadBranches = useCallback(() => {
-    return getBranches(repo)
+    return getBranches(appId)
       .then((data) => {
         setBranches(data.branches)
         setError('')
       })
       .catch(() => setError('Could not load branches from the code tool'))
-  }, [repo])
+  }, [appId])
 
   useEffect(() => {
     loadBranches()

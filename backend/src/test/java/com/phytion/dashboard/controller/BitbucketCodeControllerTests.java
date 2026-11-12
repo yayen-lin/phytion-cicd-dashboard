@@ -11,9 +11,8 @@ import java.util.List;
 import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.model.CodeBranch;
 import com.phytion.dashboard.model.CodeCommit;
-import com.phytion.dashboard.model.CodeRepo;
 import com.phytion.dashboard.service.BitbucketCodeService;
-import com.phytion.dashboard.service.RepoNotFoundException;
+import com.phytion.dashboard.service.AppNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,7 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 class BitbucketCodeControllerTests {
 
-    private static final String REPO = "bitbucket:andy-test-app/sample-app";
+    private static final String APP = "sample-app";
 
     @Autowired
     private MockMvc mvc;
@@ -38,32 +37,19 @@ class BitbucketCodeControllerTests {
     private BitbucketCodeService codeService;
 
     @Test
-    void listReposNeedsLogin() throws Exception {
-        mvc.perform(get("/api/code/repos")).andExpect(status().isUnauthorized());
+    void listBranchesNeedsLogin() throws Exception {
+        mvc.perform(get("/api/code/branches").param("appId", APP)).andExpect(status().isUnauthorized());
     }
 
     @Test
     @WithMockUser
-    void listReposReturnsIdToolAndRepo() throws Exception {
-        when(codeService.listRepos()).thenReturn(List.of(new CodeRepo("bitbucket", "andy-test-app", "sample-app", null)));
-
-        mvc.perform(get("/api/code/repos"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(REPO))
-                .andExpect(jsonPath("$[0].tool").value("bitbucket"))
-                .andExpect(jsonPath("$[0].workspace").value("andy-test-app"))
-                .andExpect(jsonPath("$[0].name").value("sample-app"));
-    }
-
-    @Test
-    @WithMockUser
-    void listBranchesReturnsTheRepoAndItsBranches() throws Exception {
-        when(codeService.listBranches(REPO)).thenReturn(List.of(
+    void listBranchesReturnsTheAppAndItsBranches() throws Exception {
+        when(codeService.listBranches(APP)).thenReturn(List.of(
                 new CodeBranch("main", commit(), "https://bitbucket.org/andy-test-app/sample-app/branch/main")));
 
-        mvc.perform(get("/api/code/branches").param("repoId", REPO))
+        mvc.perform(get("/api/code/branches").param("appId", APP))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.repo").value(REPO))
+                .andExpect(jsonPath("$.app").value(APP))
                 .andExpect(jsonPath("$.branches[0].name").value("main"))
                 .andExpect(jsonPath("$.branches[0].latestCommit.hash").value("cc99f6b"))
                 .andExpect(jsonPath("$.branches[0].latestCommit.committedAt").value("2026-11-03T22:11:13Z"));
@@ -71,10 +57,10 @@ class BitbucketCodeControllerTests {
 
     @Test
     @WithMockUser
-    void listCommitsReturnsTheRepoBranchAndCommits() throws Exception {
-        when(codeService.listCommits(REPO, "main")).thenReturn(List.of(commit()));
+    void listCommitsReturnsTheAppBranchAndCommits() throws Exception {
+        when(codeService.listCommits(APP, "main")).thenReturn(List.of(commit()));
 
-        mvc.perform(get("/api/code/commits").param("repoId", REPO).param("branch", "main"))
+        mvc.perform(get("/api/code/commits").param("appId", APP).param("branch", "main"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.branch").value("main"))
                 .andExpect(jsonPath("$.commits[0].hash").value("cc99f6b"))
@@ -84,25 +70,25 @@ class BitbucketCodeControllerTests {
     @Test
     @WithMockUser
     void listCommitsNeedsABranch() throws Exception {
-        mvc.perform(get("/api/code/commits").param("repoId", REPO)).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/code/commits").param("appId", APP)).andExpect(status().isBadRequest());
     }
 
     @Test
     @WithMockUser
-    void unknownRepoGives404WithTheReason() throws Exception {
-        when(codeService.listBranches("bitbucket:x/y")).thenThrow(new RepoNotFoundException("bitbucket:x/y"));
+    void unknownAppGives404WithTheReason() throws Exception {
+        when(codeService.listBranches("x")).thenThrow(new AppNotFoundException("x"));
 
-        mvc.perform(get("/api/code/branches").param("repoId", "bitbucket:x/y"))
+        mvc.perform(get("/api/code/branches").param("appId", "x"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("Unknown repo: bitbucket:x/y"));
+                .andExpect(jsonPath("$.error").value("Unknown app: x"));
     }
 
     @Test
     @WithMockUser
     void codeToolFailureGives502WithTheReason() throws Exception {
-        when(codeService.listBranches(REPO)).thenThrow(new CodeToolException("Bitbucket not reachable"));
+        when(codeService.listBranches(APP)).thenThrow(new CodeToolException("Bitbucket not reachable"));
 
-        mvc.perform(get("/api/code/branches").param("repoId", REPO))
+        mvc.perform(get("/api/code/branches").param("appId", APP))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error").value("Bitbucket not reachable"));
     }

@@ -6,13 +6,15 @@ import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} f
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
-import {getVersions, type ReleaseApp, type ReleaseVersion} from '@/api/release'
+import type {App} from '@/api/apps'
+import {getVersions, type ReleaseVersion} from '@/api/release'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import CommitLink from '@/features/code/CommitLink'
 import ReleaseDialog from './ReleaseDialog'
 
 type Props = {
-  app: ReleaseApp
+  /** An app that is released */
+  app: App
 }
 
 /**
@@ -127,7 +129,7 @@ function VersionsTable({app}: Props) {
           </Table>
         )}
       </CardContent>
-      <BuildDetailsDialog pipeline={app.pipeline} buildId={selectedId} onClose={() => setSelectedId(null)}/>
+      <BuildDetailsDialog appId={app.id} buildId={selectedId} onClose={() => setSelectedId(null)}/>
       <ReleaseDialog app={app} open={releaseOpen} onOpenChange={setReleaseOpen} onReleased={handleReleased}/>
     </Card>
   )

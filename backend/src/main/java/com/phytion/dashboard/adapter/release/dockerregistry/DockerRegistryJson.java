@@ -1,4 +1,4 @@
-package com.phytion.dashboard.adapter.release.registry;
+package com.phytion.dashboard.adapter.release.dockerregistry;
 
 import java.util.List;
 import java.util.Map;
@@ -7,11 +7,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
- * The registry's JSON responses that RegistryAdapter reads. Everything else is ignored.
+ * The registry's JSON responses that DockerRegistryAdapter reads. Everything else is ignored.
  */
-final class RegistryJson {
+final class DockerRegistryJson {
 
-    private RegistryJson() {
+    private DockerRegistryJson() {
     }
 
     /** GET /v2/{image}/tags/list. "tags" is null when every tag was deleted */

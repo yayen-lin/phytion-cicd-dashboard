@@ -1,13 +1,12 @@
 package com.phytion.dashboard.model;
 
+import jakarta.validation.constraints.NotBlank;
+
 /**
- * A CI pipeline the dashboard shows, and the external tool that runs and hosts it.
+ * An app's CI pipeline, and the external tool that runs and hosts it.
  *
- * @param tool which CI tool runs the pipeline
- * @param job  the job's name in that tool
+ * @param tool which CI tool runs the pipeline, e.g. "jenkins"
+ * @param job  the job's name in that tool, e.g. "sample-app"
  */
-public record CiPipeline(String tool, String job) {
-    public String id() {
-        return tool + ":" + job;
-    }
+public record CiPipeline(@NotBlank String tool, @NotBlank String job) {
 }

@@ -18,9 +18,7 @@ import TestResults from './TestResults'
 import {formatDuration} from '@/lib/format'
 
 type Props = {
-  /** e.g. "jenkins:sample-app" */
-  pipeline: string
-  /** The build to show; null keeps the dialog closed */
+  appId: string
   buildId: string | null
   onClose: () => void
 }
@@ -34,7 +32,7 @@ function Field({label, children}: { label: string, children: ReactNode }) {
   )
 }
 
-/** The full commit hash, with a button that copies it. */
+/** The commit hash and a button that copies it. */
 function CommitHash({commit}: { commit: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -55,15 +53,15 @@ function CommitHash({commit}: { commit: string }) {
 }
 
 /** Loads one build from the backend and shows it. Mounted fresh for each build the dialog opens. */
-function BuildDetails({pipeline, buildId}: { pipeline: string, buildId: string }) {
+function BuildDetails({appId, buildId}: { appId: string, buildId: string }) {
   const [details, setDetails] = useState<CiBuildDetails | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getBuild(pipeline, buildId)
+    getBuild(appId, buildId)
       .then(setDetails)
       .catch(() => setError('Could not load the build from the CI tool'))
-  }, [pipeline, buildId])
+  }, [appId, buildId])
 
   const build = details?.build
 
@@ -74,7 +72,7 @@ function BuildDetails({pipeline, buildId}: { pipeline: string, buildId: string }
           <DialogTitle className="text-lg">Build #{buildId}</DialogTitle>
           {build && <StatusBadge status={build.status}/>}
         </div>
-        <DialogDescription className="font-mono">{pipeline}</DialogDescription>
+        <DialogDescription className="font-mono">{appId}</DialogDescription>
       </DialogHeader>
 
       {error ? (
@@ -111,7 +109,7 @@ function BuildDetails({pipeline, buildId}: { pipeline: string, buildId: string }
           <section className="space-y-3 border-t pt-4">
             <h3 className="text-sm font-medium">Tests</h3>
             {build.tests
-              ? <TestResults pipeline={pipeline} buildId={buildId}/>
+              ? <TestResults appId={appId} buildId={buildId}/>
               : <p className="text-sm text-muted-foreground">
                   {build.status === 'RUNNING' ? 'Running...' : 'No test results (the build stopped before the tests).'}
                 </p>}
@@ -133,12 +131,12 @@ function BuildDetails({pipeline, buildId}: { pipeline: string, buildId: string }
 }
 
 /** A build's details and, below them, its test results, in a modal with links to its page and log in the CI tool. */
-function BuildDetailsDialog({pipeline, buildId, onClose}: Props) {
+function BuildDetailsDialog({appId, buildId, onClose}: Props) {
   return (
     <Dialog open={buildId !== null} onOpenChange={(open) => !open && onClose()}>
       {buildId && (
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <BuildDetails key={buildId} pipeline={pipeline} buildId={buildId}/>
+          <BuildDetails key={buildId} appId={appId} buildId={buildId}/>
         </DialogContent>
       )}
     </Dialog>

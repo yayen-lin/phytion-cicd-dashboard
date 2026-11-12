@@ -1,21 +1,5 @@
 import {checkLogin, errorMessage, postJson} from './client'
 
-/** An app the Release page shows: its image in the release tool, the CI pipeline that releases it, and its code repo */
-export type ReleaseApp = {
-  id: string // e.g. "registry:sample-app"
-  tool: string // e.g. "registry"
-  image: string // e.g. "sample-app"
-  pipeline: string // e.g. "jenkins:sample-app"
-  repo: string // the code repo that releases are tagged in, e.g. "bitbucket:andy-test-app/sample-app"
-}
-
-/** Returns the configured apps, in the order the backend lists them. */
-export async function getApps(): Promise<ReleaseApp[]> {
-  const res = await checkLogin(fetch('/api/release/apps'))
-  if (!res.ok) throw new Error(`GET /api/release/apps failed: ${res.status}`)
-  return res.json()
-}
-
 /**
  * One released version of an app: an image in the release tool. Everything but the version comes from the image's
  * labels, so each is null when the image doesn't have that label.
@@ -29,8 +13,8 @@ export type ReleaseVersion = {
 }
 
 /** Returns the newest versions of an app, highest version first. */
-export async function getVersions(app: string): Promise<{ app: string, versions: ReleaseVersion[] }> {
-  const res = await checkLogin(fetch(`/api/release/versions?${new URLSearchParams({app})}`))
+export async function getVersions(appId: string): Promise<{ app: string, versions: ReleaseVersion[] }> {
+  const res = await checkLogin(fetch(`/api/release/versions?${new URLSearchParams({appId})}`))
   if (!res.ok) throw new Error(`GET /api/release/versions failed: ${res.status}`)
   return res.json()
 }
@@ -43,8 +27,8 @@ export const RELEASE_VERSION = /^v\d{1,9}\.\d{1,9}\.\d{1,9}$/
  * image. Returns the build's id, or null when the CI tool hasn't started it yet. Can take up to ~30 seconds.
  * Throws with the backend's reason when it refuses, e.g. the tag already exists.
  */
-export async function release(app: string, version: string, commit: string): Promise<string | null> {
-  const res = await checkLogin(postJson('/api/release/versions', {app, version, commit}))
+export async function release(appId: string, version: string, commit: string): Promise<string | null> {
+  const res = await checkLogin(postJson('/api/release/versions', {appId, version, commit}))
   if (!res.ok) throw new Error(await errorMessage(res))
   const data: { buildId: string | null } = await res.json()
   return data.buildId

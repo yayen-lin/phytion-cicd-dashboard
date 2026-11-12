@@ -1,21 +1,16 @@
 package com.phytion.dashboard.model;
 
+import jakarta.validation.constraints.NotBlank;
+
 /**
- * A code repo the dashboard shows, and the tool that hosts it. Configured in application.properties.
+ * An app's code repo, and the tool that hosts it.
  *
  * @param tool      the external tool that hosts the repo
  * @param workspace the workspace the repo is in
  * @param name      the name of the repo in that workspace
  * @param token     an access token to this repo with write permission for creating a tag
  */
-public record CodeRepo(String tool, String workspace, String name, String token) {
-
-    /**
-     * In the form the API refers to the repo
-     */
-    public String id() {
-        return tool + ":" + workspace + "/" + name;
-    }
+public record CodeRepo(@NotBlank String tool, @NotBlank String workspace, @NotBlank String name, String token) {
 
     public boolean hasToken() {
         return token != null && !token.isBlank();

@@ -14,11 +14,10 @@ import java.util.Optional;
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.adapter.release.ReleaseToolException;
-import com.phytion.dashboard.model.ReleaseApp;
 import com.phytion.dashboard.model.ReleaseVersion;
 import com.phytion.dashboard.service.AppNotFoundException;
 import com.phytion.dashboard.service.InvalidReleaseException;
-import com.phytion.dashboard.service.RegistryReleaseService;
+import com.phytion.dashboard.service.DockerRegistryReleaseService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -30,42 +29,27 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
- * Tests the HTTP side only (login, JSON, status codes), with a fake RegistryReleaseService.
+ * Tests the HTTP side only (login, JSON, status codes), with a fake DockerRegistryReleaseService.
  */
 @SpringBootTest(properties = "DASHBOARD_USERS_FILE=src/test/resources/test-users.properties")
 @AutoConfigureMockMvc
-class RegistryReleaseControllerTests {
+class DockerRegistryReleaseControllerTests {
 
-    private static final String APP = "registry:sample-app";
+    private static final String APP = "sample-app";
     private static final String COMMIT = "a4dad009a1f3ef48f7239a3dd155c64ca51d466f";
     private static final String RELEASE = """
-            {"app": "registry:sample-app", "version": "v1.4.0", "commit": "a4dad009a1f3ef48f7239a3dd155c64ca51d466f"}
+            {"appId": "sample-app", "version": "v1.4.0", "commit": "a4dad009a1f3ef48f7239a3dd155c64ca51d466f"}
             """;
 
     @Autowired
     private MockMvc mvc;
 
     @MockitoBean
-    private RegistryReleaseService releaseService;
+    private DockerRegistryReleaseService releaseService;
 
     @Test
-    void listAppsNeedsLogin() throws Exception {
-        mvc.perform(get("/api/release/apps")).andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @WithMockUser
-    void listAppsReturnsIdToolImagePipelineAndRepo() throws Exception {
-        when(releaseService.apps()).thenReturn(List.of(new ReleaseApp("registry", "sample-app", "jenkins:sample-app",
-                "bitbucket:andy-test-app/sample-app")));
-
-        mvc.perform(get("/api/release/apps"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(APP))
-                .andExpect(jsonPath("$[0].tool").value("registry"))
-                .andExpect(jsonPath("$[0].image").value("sample-app"))
-                .andExpect(jsonPath("$[0].pipeline").value("jenkins:sample-app"))
-                .andExpect(jsonPath("$[0].repo").value("bitbucket:andy-test-app/sample-app"));
+    void listVersionsNeedsLogin() throws Exception {
+        mvc.perform(get("/api/release/versions").param("appId", APP)).andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -77,7 +61,7 @@ class RegistryReleaseControllerTests {
                         Instant.parse("2026-11-06T18:16:33Z")),
                 new ReleaseVersion("0.1.0", null, null, null, null)));
 
-        mvc.perform(get("/api/release/versions").param("app", APP))
+        mvc.perform(get("/api/release/versions").param("appId", APP))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.app").value(APP))
                 .andExpect(jsonPath("$.versions[0].version").value("0.1.1"))
@@ -101,11 +85,11 @@ class RegistryReleaseControllerTests {
     @Test
     @WithMockUser
     void unknownAppGives404WithTheReason() throws Exception {
-        when(releaseService.listVersions("registry:x")).thenThrow(new AppNotFoundException("registry:x"));
+        when(releaseService.listVersions("x")).thenThrow(new AppNotFoundException("x"));
 
-        mvc.perform(get("/api/release/versions").param("app", "registry:x"))
+        mvc.perform(get("/api/release/versions").param("appId", "x"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error").value("Unknown app: registry:x"));
+                .andExpect(jsonPath("$.error").value("Unknown app: x"));
     }
 
     @Test
@@ -113,7 +97,7 @@ class RegistryReleaseControllerTests {
     void releaseToolFailureGives502WithTheReason() throws Exception {
         when(releaseService.listVersions(APP)).thenThrow(new ReleaseToolException("Registry not reachable"));
 
-        mvc.perform(get("/api/release/versions").param("app", APP))
+        mvc.perform(get("/api/release/versions").param("appId", APP))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error").value("Registry not reachable"));
     }

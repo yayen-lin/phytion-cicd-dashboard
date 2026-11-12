@@ -1,4 +1,4 @@
-package com.phytion.dashboard.adapter.release.registry;
+package com.phytion.dashboard.adapter.release.dockerregistry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -21,20 +21,20 @@ import org.springframework.web.client.RestClient;
 /**
  * Tests the registry adapter against a fake registry, using JSON shaped like real registry:2 responses.
  */
-class RegistryAdapterImplTests {
+class DockerRegistryAdapterImplTests {
 
     private static final MediaType INDEX = MediaType.parseMediaType("application/vnd.oci.image.index.v1+json");
     private static final MediaType MANIFEST = MediaType.parseMediaType("application/vnd.oci.image.manifest.v1+json");
 
     // Digests go in the path with ":" encoded (sha256%3A...), which the registry accepts
     private MockRestServiceServer registry;
-    private RegistryAdapterImpl adapter;
+    private DockerRegistryAdapterImpl adapter;
 
     @BeforeEach
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://registry");
         registry = MockRestServiceServer.bindTo(builder).build();
-        adapter = new RegistryAdapterImpl(builder.build());
+        adapter = new DockerRegistryAdapterImpl(builder.build());
     }
 
     @Test

@@ -3,8 +3,8 @@ package com.phytion.dashboard.model;
 /**
  * Which audit log entries to show. A null field matches every entry.
  *
- * @param target       e.g. "jenkins:sample-app"
- * @param actionType   e.g. TRIGGER_BUILD
+ * @param target       the app
+ * @param actionType   an action taken on the dashboard
  * @param username     who took the action
  * @param actionResult whether the action worked
  */

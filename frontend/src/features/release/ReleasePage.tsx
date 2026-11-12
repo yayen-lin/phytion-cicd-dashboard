@@ -1,33 +1,24 @@
 import {useEffect, useState} from 'react'
 import {useSearchParams} from 'react-router'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Skeleton} from '@/components/ui/skeleton'
-import {getApps, type ReleaseApp} from '@/api/release'
+import {getApps, appToImageLabel, type App} from '@/api/apps'
+import AppSelect from '@/features/apps/AppSelect'
 import VersionsTable from './VersionsTable'
 
-const toolNames: Record<string, string> = {
-  'registry': 'Registry',
-  'ecr': 'AWS ECR',
-}
-
-/** "registry:sample-app" -> "Registry · sample-app" */
-function appLabel(app: ReleaseApp): string {
-  return `${toolNames[app.tool] ?? app.tool} · ${app.image}`
-}
-
 /**
- * The Release stage: pick an app, then see its released versions (images in the registry).
- * The app is in the query (?app=registry:sample-app), so every view has its own link.
+ * The Release stage: pick an app, then see its released versions (images in the registry). Only apps with a release
+ * configured are listed.
+ * The app is in the query (?app=sample-app), so every view has its own link.
  */
 function ReleasePage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [apps, setApps] = useState<ReleaseApp[] | null>(null)
+  const [apps, setApps] = useState<App[] | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
     getApps()
-      .then(setApps)
+      .then((all) => setApps(all.filter((a) => a.release)))
       .catch(() => setError('Could not load the apps'))
   }, [])
 
@@ -42,14 +33,7 @@ function ReleasePage() {
           <p className="text-sm text-muted-foreground">Versions of the app that are ready to deploy</p>
         </div>
         {apps && app && (
-          <Select value={app.id} onValueChange={(id) => setSearchParams({app: id})}>
-            <SelectTrigger className="w-64" aria-label="App">
-              <SelectValue/>
-            </SelectTrigger>
-            <SelectContent>
-              {apps.map((a) => <SelectItem key={a.id} value={a.id}>{appLabel(a)}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <AppSelect apps={apps} value={app} onChange={(id) => setSearchParams({app: id})} part={appToImageLabel}/>
         )}
       </div>
 
@@ -62,8 +46,8 @@ function ReleasePage() {
         <Skeleton className="h-64 w-full"/>
       ) : !app ? (
         <Alert>
-          <AlertTitle>No apps configured</AlertTitle>
-          <AlertDescription>Add one to <code>dashboard.release.apps</code> in the backend's application.properties.</AlertDescription>
+          <AlertTitle>No released apps</AlertTitle>
+          <AlertDescription>Add a <code>release</code> to an app in <code>dashboard.apps</code> in the backend's application.properties.</AlertDescription>
         </Alert>
       ) : (
         // key: switching apps starts the table fresh (empty, loading) instead of showing the old app's rows

@@ -1,20 +1,5 @@
 import { checkLogin } from './client'
 
-/** A code repo the dashboard shows */
-export type CodeRepo = {
-  id: string
-  tool: string
-  workspace: string
-  name: string
-}
-
-/** Returns the configured code repos, in the order the backend lists them. */
-export async function getRepos(): Promise<CodeRepo[]> {
-  const res = await checkLogin(fetch('/api/code/repos'))
-  if (!res.ok) throw new Error(`GET /api/code/repos failed: ${res.status}`)
-  return res.json()
-}
-
 /** One commit in a repo */
 export type CodeCommit = {
   hash: string
@@ -31,20 +16,20 @@ export type CodeBranch = {
   url: string // the branch's page in the code tool
 }
 
-/** Returns the branches of a repo, the most recently committed to first. */
-export async function getBranches(repoId: string): Promise<{ repo: string, branches: CodeBranch[] }> {
-  const res = await checkLogin(fetch(`/api/code/branches?${new URLSearchParams({ repoId })}`))
+/** Returns the branches of an app's repo, the most recently committed to first. */
+export async function getBranches(appId: string): Promise<{ app: string, branches: CodeBranch[] }> {
+  const res = await checkLogin(fetch(`/api/code/branches?${new URLSearchParams({ appId })}`))
   if (!res.ok) throw new Error(`GET /api/code/branches failed: ${res.status}`)
   return res.json()
 }
 
-/** Returns the most recent commits on a branch, newest first. */
-export async function getCommits(repoId: string, branch: string): Promise<{
-  repo: string,
+/** Returns the most recent commits on a branch of an app's repo, newest first. */
+export async function getCommits(appId: string, branch: string): Promise<{
+  app: string,
   branch: string,
   commits: CodeCommit[]
 }> {
-  const res = await checkLogin(fetch(`/api/code/commits?${new URLSearchParams({ repoId, branch })}`))
+  const res = await checkLogin(fetch(`/api/code/commits?${new URLSearchParams({ appId, branch })}`))
   if (!res.ok) throw new Error(`GET /api/code/commits failed: ${res.status}`)
   return res.json()
 }

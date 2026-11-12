@@ -18,15 +18,13 @@ import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.code.CodeToolException;
-import com.phytion.dashboard.adapter.release.registry.RegistryAdapter;
-import com.phytion.dashboard.adapter.release.registry.RegistryProperties;
-import com.phytion.dashboard.config.CiProperties;
-import com.phytion.dashboard.config.CodeProperties;
-import com.phytion.dashboard.config.ReleaseProperties;
+import com.phytion.dashboard.adapter.release.dockerregistry.DockerRegistryAdapter;
+import com.phytion.dashboard.adapter.release.dockerregistry.DockerRegistryProperties;
+import com.phytion.dashboard.config.AppsProperties;
 import com.phytion.dashboard.model.AuditEntry;
 import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.CodeRepo;
-import com.phytion.dashboard.model.ReleaseApp;
+import com.phytion.dashboard.model.ReleaseImage;
 import com.phytion.dashboard.model.ReleaseVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,50 +32,50 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests the release logic with a fake registry, fake code and CI services and a fake audit log: no Spring.
  */
-class RegistryReleaseServiceTests {
+class DockerRegistryReleaseServiceTests {
 
-    private static final String APP = "registry:sample-app";
-    private static final String REPO = "bitbucket:andy-test-app/sample-app";
+    private static final String APP = "sample-app";
+    // The image's name differs from the app id, to show which one goes where
+    private static final String IMAGE = "sample-app-image";
     private static final String COMMIT = "a4dad009a1f3ef48f7239a3dd155c64ca51d466f";
     private static final String COMMIT_URL = "https://bitbucket.org/andy-test-app/sample-app/commits/" + COMMIT;
-    private static final CodeProperties CODE_REPOS =
-            new CodeProperties(List.of(new CodeRepo("bitbucket", "andy-test-app", "sample-app", null)));
-    private static final CiProperties CI_PIPELINES =
-            new CiProperties(List.of(new CiPipeline("jenkins", "sample-app")));
-    private static final ReleaseProperties APPS = new ReleaseProperties(List.of(
-            new ReleaseApp("registry", "sample-app", "jenkins:sample-app", REPO)));
+    private static final CodeRepo REPO = new CodeRepo("bitbucket", "andy-test-app", "sample-app", null);
+    private static final CiPipeline PIPELINE = new CiPipeline("jenkins", "sample-app");
+    private static final AppsProperties APPS = new AppsProperties(Map.of(
+            APP, new AppsProperties.AppSettings(REPO, PIPELINE, new ReleaseImage("docker-registry", IMAGE)),
+            "unreleased-app", new AppsProperties.AppSettings(REPO, PIPELINE, null)));
     private static final Map<String, String> TAG_BUILD = Map.of("GIT_REF", "refs/tags/v1.4.0");
 
-    private RegistryAdapter release;
+    private DockerRegistryAdapter release;
     private BitbucketCodeService code;
     private JenkinsCiService ci;
     private AuditService audit;
-    private RegistryReleaseService releaseService;
+    private DockerRegistryReleaseService releaseService;
 
     @BeforeEach
     void setUp() {
-        release = mock(RegistryAdapter.class);
+        release = mock(DockerRegistryAdapter.class);
         code = mock(BitbucketCodeService.class);
         ci = mock(JenkinsCiService.class);
         audit = mock(AuditService.class);
-        when(code.getCommitUrl(REPO, COMMIT)).thenReturn(COMMIT_URL);
+        when(code.getCommitUrl(APP, COMMIT)).thenReturn(COMMIT_URL);
         releaseService = service(APPS, 20);
     }
 
     @Test
     void releaseTagsTheCommitStartsTheTagBuildAndRecordsIt() {
-        when(ci.startBuild("jenkins:sample-app", TAG_BUILD)).thenReturn(Optional.of("12"));
+        when(ci.startBuild(APP, TAG_BUILD)).thenReturn(Optional.of("12"));
 
         assertThat(releaseService.release(APP, "v1.4.0", COMMIT, "andy")).contains("12");
 
-        verify(code).createTag(REPO, "v1.4.0", COMMIT);
+        verify(code).createTag(APP, "v1.4.0", COMMIT);
         verify(audit).add("andy", AuditEntry.ActionType.RELEASE, APP, AuditEntry.ActionResult.SUCCESS, "12",
                 "v1.4.0 on commit a4dad00");
     }
 
     @Test
     void releaseWhoseBuildIsStillQueuedIsRecordedWithoutBuildId() {
-        when(ci.startBuild("jenkins:sample-app", TAG_BUILD)).thenReturn(Optional.empty());
+        when(ci.startBuild(APP, TAG_BUILD)).thenReturn(Optional.empty());
 
         assertThat(releaseService.release(APP, "v1.4.0", COMMIT, "andy")).isEmpty();
 
@@ -88,7 +86,7 @@ class RegistryReleaseServiceTests {
     @Test
     void tagRefusedIsRecordedAndNoBuildStarts() {
         doThrow(new CodeToolException("Bitbucket refused the tag: Tag \"v1.4.0\" already exists"))
-                .when(code).createTag(REPO, "v1.4.0", COMMIT);
+                .when(code).createTag(APP, "v1.4.0", COMMIT);
 
         assertThatThrownBy(() -> releaseService.release(APP, "v1.4.0", COMMIT, "andy"))
                 .isInstanceOf(CodeToolException.class)
@@ -101,7 +99,7 @@ class RegistryReleaseServiceTests {
 
     @Test
     void buildThatDoesNotStartIsRecordedAndSaysTheTagExists() {
-        when(ci.startBuild("jenkins:sample-app", TAG_BUILD)).thenThrow(new CiToolException("Jenkins not reachable"));
+        when(ci.startBuild(APP, TAG_BUILD)).thenThrow(new CiToolException("Jenkins not reachable"));
 
         assertThatThrownBy(() -> releaseService.release(APP, "v1.4.0", COMMIT, "andy"))
                 .isInstanceOf(CiToolException.class)
@@ -137,7 +135,7 @@ class RegistryReleaseServiceTests {
 
     @Test
     void releaseOfUnknownOrMissingAppIsRejected() {
-        assertThatThrownBy(() -> releaseService.release("registry:other-app", "v1.4.0", COMMIT, "andy"))
+        assertThatThrownBy(() -> releaseService.release("other-app", "v1.4.0", COMMIT, "andy"))
                 .isInstanceOf(AppNotFoundException.class);
         assertThatThrownBy(() -> releaseService.release(null, "v1.4.0", COMMIT, "andy"))
                 .isInstanceOf(InvalidReleaseException.class)
@@ -148,8 +146,8 @@ class RegistryReleaseServiceTests {
     @Test
     void listVersionsReadsBuildCommitAndReleaseTimeFromTheLabels() {
         // The labels the Release stage of the Jenkinsfile sets
-        when(release.listTags("sample-app")).thenReturn(List.of("0.1.1"));
-        when(release.getLabels("sample-app", "0.1.1")).thenReturn(Map.of(
+        when(release.listTags(IMAGE)).thenReturn(List.of("0.1.1"));
+        when(release.getLabels(IMAGE, "0.1.1")).thenReturn(Map.of(
                 "org.opencontainers.image.created", "2026-11-06T18:16:33Z",
                 "org.opencontainers.image.revision", COMMIT,
                 "org.opencontainers.image.version", "0.1.1",
@@ -161,8 +159,8 @@ class RegistryReleaseServiceTests {
 
     @Test
     void imageWithoutTheLabelsHasOnlyItsVersion() {
-        when(release.listTags("sample-app")).thenReturn(List.of("0.1.0"));
-        when(release.getLabels("sample-app", "0.1.0")).thenReturn(Map.of());
+        when(release.listTags(IMAGE)).thenReturn(List.of("0.1.0"));
+        when(release.getLabels(IMAGE, "0.1.0")).thenReturn(Map.of());
 
         assertThat(releaseService.listVersions(APP))
                 .containsExactly(new ReleaseVersion("0.1.0", null, null, null, null));
@@ -171,8 +169,8 @@ class RegistryReleaseServiceTests {
 
     @Test
     void releaseTimeThatIsNotADateIsLeftOut() {
-        when(release.listTags("sample-app")).thenReturn(List.of("0.1.1"));
-        when(release.getLabels("sample-app", "0.1.1")).thenReturn(Map.of(
+        when(release.listTags(IMAGE)).thenReturn(List.of("0.1.1"));
+        when(release.getLabels(IMAGE, "0.1.1")).thenReturn(Map.of(
                 "org.opencontainers.image.created", "yesterday",
                 "com.phytionassetmanagement.build-number", "11"));
 
@@ -183,9 +181,9 @@ class RegistryReleaseServiceTests {
     @Test
     void listVersionsPutsTheHighestVersionFirstByNumberNotByName() {
         // By name, "1.10.0" would come before "1.9.0", and "10.0.0" before "2.0.0"
-        when(release.listTags("sample-app"))
+        when(release.listTags(IMAGE))
                 .thenReturn(List.of("1.9.0", "2.0.0", "1.10.0", "10.0.0", "1.9.10", "1.9.2"));
-        when(release.getLabels(eq("sample-app"), anyString())).thenReturn(Map.of());
+        when(release.getLabels(eq(IMAGE), anyString())).thenReturn(Map.of());
 
         assertThat(releaseService.listVersions(APP)).extracting(ReleaseVersion::version)
                 .containsExactly("10.0.0", "2.0.0", "1.10.0", "1.9.10", "1.9.2", "1.9.0");
@@ -193,8 +191,8 @@ class RegistryReleaseServiceTests {
 
     @Test
     void tagsInAnotherFormatComeLastByName() {
-        when(release.listTags("sample-app")).thenReturn(List.of("latest", "1.4.0", "8-05663bb"));
-        when(release.getLabels(eq("sample-app"), anyString())).thenReturn(Map.of());
+        when(release.listTags(IMAGE)).thenReturn(List.of("latest", "1.4.0", "8-05663bb"));
+        when(release.getLabels(eq(IMAGE), anyString())).thenReturn(Map.of());
 
         assertThat(releaseService.listVersions(APP)).extracting(ReleaseVersion::version)
                 .containsExactly("1.4.0", "8-05663bb", "latest");
@@ -203,53 +201,33 @@ class RegistryReleaseServiceTests {
     @Test
     void listVersionsOnlyReadsTheLabelsOfTheNewestMaxVersions() {
         releaseService = service(APPS, 2);
-        when(release.listTags("sample-app")).thenReturn(List.of("0.1.0", "0.3.0", "0.2.0"));
-        when(release.getLabels(eq("sample-app"), anyString())).thenReturn(Map.of());
+        when(release.listTags(IMAGE)).thenReturn(List.of("0.1.0", "0.3.0", "0.2.0"));
+        when(release.getLabels(eq(IMAGE), anyString())).thenReturn(Map.of());
 
         assertThat(releaseService.listVersions(APP)).extracting(ReleaseVersion::version)
                 .containsExactly("0.3.0", "0.2.0");
-        verify(release, never()).getLabels("sample-app", "0.1.0");
+        verify(release, never()).getLabels(IMAGE, "0.1.0");
     }
 
     @Test
     void unknownAppIsRejected() {
-        assertThatThrownBy(() -> releaseService.listVersions("registry:other-app"))
+        assertThatThrownBy(() -> releaseService.listVersions("other-app"))
                 .isInstanceOf(AppNotFoundException.class)
-                .hasMessage("Unknown app: registry:other-app");
+                .hasMessage("Unknown app: other-app");
     }
 
     @Test
-    void appOnAToolWithoutAdapterFailsAtStartup() {
-        ReleaseProperties apps = new ReleaseProperties(List.of(
-                new ReleaseApp("ecr", "sample-app", "jenkins:sample-app", REPO)));
-
-        assertThatThrownBy(() -> service(apps, 20))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ecr");
+    void appThatIsNotReleasedIsRejected() {
+        assertThatThrownBy(() -> releaseService.listVersions("unreleased-app"))
+                .isInstanceOf(AppNotFoundException.class)
+                .hasMessage("App unreleased-app has no release configured");
+        assertThatThrownBy(() -> releaseService.release("unreleased-app", "v1.4.0", COMMIT, "andy"))
+                .isInstanceOf(AppNotFoundException.class);
+        verifyNoInteractions(release, code, ci, audit);
     }
 
-    @Test
-    void appWithARepoThatIsNotConfiguredFailsAtStartup() {
-        ReleaseProperties apps = new ReleaseProperties(List.of(
-                new ReleaseApp("registry", "sample-app", "jenkins:sample-app", "bitbucket:andy-test-app/other-app")));
-
-        assertThatThrownBy(() -> service(apps, 20))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("bitbucket:andy-test-app/other-app");
-    }
-
-    @Test
-    void appWithAPipelineThatIsNotConfiguredFailsAtStartup() {
-        ReleaseProperties apps = new ReleaseProperties(List.of(
-                new ReleaseApp("registry", "sample-app", "jenkins:other-app", REPO)));
-
-        assertThatThrownBy(() -> service(apps, 20))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenkins:other-app");
-    }
-
-    private RegistryReleaseService service(ReleaseProperties apps, int maxVersions) {
-        return new RegistryReleaseService(release, code, ci, audit, apps, CODE_REPOS, CI_PIPELINES,
-                new RegistryProperties("http://registry", maxVersions));
+    private DockerRegistryReleaseService service(AppsProperties apps, int maxVersions) {
+        return new DockerRegistryReleaseService(release, code, ci, audit, new AppService(apps),
+                new DockerRegistryProperties("http://registry", maxVersions));
     }
 }

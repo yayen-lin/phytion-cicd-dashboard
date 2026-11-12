@@ -14,11 +14,12 @@ import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
 import com.phytion.dashboard.adapter.ci.CiToolException;
-import com.phytion.dashboard.config.CiProperties;
+import com.phytion.dashboard.config.AppsProperties;
 import com.phytion.dashboard.model.AuditEntry;
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.CiPipeline;
+import com.phytion.dashboard.model.CodeRepo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -35,53 +36,56 @@ class JenkinsCiServiceTests {
     void setUp() {
         ci = mock(JenkinsAdapter.class);
         audit = mock(AuditService.class);
-        ciService = new JenkinsCiService(ci, audit, new CiProperties(List.of(new CiPipeline("jenkins", "sample-app"))));
+        // The job's name differs from the app id, to show which one goes where
+        ciService = new JenkinsCiService(ci, audit, new AppService(new AppsProperties(Map.of("sample-app",
+                new AppsProperties.AppSettings(new CodeRepo("bitbucket", "andy-test-app", "sample-app", null),
+                        new CiPipeline("jenkins", "sample-app-job"), null)))));
     }
 
     @Test
-    void listBuildsAsksTheToolForThePipelinesJob() {
-        when(ci.listBuilds("sample-app")).thenReturn(List.of());
+    void listBuildsAsksTheToolForTheAppsJob() {
+        when(ci.listBuilds("sample-app-job")).thenReturn(List.of());
 
-        assertThat(ciService.listBuilds("jenkins:sample-app")).isEmpty();
+        assertThat(ciService.listBuilds("sample-app")).isEmpty();
 
-        verify(ci).listBuilds("sample-app");
+        verify(ci).listBuilds("sample-app-job");
     }
 
     @Test
     void getBuildStartedThroughTheDashboardShowsTheDashboardUser() {
-        when(ci.getBuild("sample-app", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "dashboard-bot", null)));
-        when(audit.findBuildStarter("jenkins:sample-app", "4")).thenReturn(Optional.of("andy"));
+        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "dashboard-bot", null)));
+        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.of("andy"));
 
-        assertThat(ciService.getBuild("jenkins:sample-app", "4")).get()
+        assertThat(ciService.getBuild("sample-app", "4")).get()
                 .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
                 .containsExactly("andy", "dashboard");
     }
 
     @Test
     void getBuildStartedOutsideTheDashboardShowsTheCiToolUser() {
-        when(ci.getBuild("sample-app", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "Andy Lin", null)));
-        when(audit.findBuildStarter("jenkins:sample-app", "4")).thenReturn(Optional.empty());
+        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "Andy Lin", null)));
+        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.empty());
 
-        assertThat(ciService.getBuild("jenkins:sample-app", "4")).get()
+        assertThat(ciService.getBuild("sample-app", "4")).get()
                 .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
                 .containsExactly("Andy Lin", "jenkins");
     }
 
     @Test
     void getBuildStartedByNoOneHasNoSource() {
-        when(ci.getBuild("sample-app", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), null, null)));
-        when(audit.findBuildStarter("jenkins:sample-app", "4")).thenReturn(Optional.empty());
+        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), null, null)));
+        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.empty());
 
-        assertThat(ciService.getBuild("jenkins:sample-app", "4")).get()
+        assertThat(ciService.getBuild("sample-app", "4")).get()
                 .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
                 .containsExactly(null, null);
     }
 
     @Test
     void getBuildThatDoesNotExistIsEmpty() {
-        when(ci.getBuild("sample-app", "99")).thenReturn(Optional.empty());
+        when(ci.getBuild("sample-app-job", "99")).thenReturn(Optional.empty());
 
-        assertThat(ciService.getBuild("jenkins:sample-app", "99")).isEmpty();
+        assertThat(ciService.getBuild("sample-app", "99")).isEmpty();
     }
 
     private static CiBuild build(String id) {
@@ -90,54 +94,54 @@ class JenkinsCiServiceTests {
     }
 
     @Test
-    void unknownPipelineIsRejected() {
-        assertThatThrownBy(() -> ciService.listBuilds("jenkins:other-app"))
-                .isInstanceOf(PipelineNotFoundException.class);
-        assertThatThrownBy(() -> ciService.triggerBuild("jenkins:other-app", "andy"))
-                .isInstanceOf(PipelineNotFoundException.class);
+    void unknownAppIsRejected() {
+        assertThatThrownBy(() -> ciService.listBuilds("other-app"))
+                .isInstanceOf(AppNotFoundException.class);
+        assertThatThrownBy(() -> ciService.triggerBuild("other-app", "andy"))
+                .isInstanceOf(AppNotFoundException.class);
     }
 
     @Test
     void startBuildPassesTheParametersAndLeavesTheAuditLogToTheCaller() {
-        when(ci.triggerBuild("sample-app", Map.of("GIT_REF", "refs/tags/v1.4.0"))).thenReturn(Optional.of("12"));
+        when(ci.triggerBuild("sample-app-job", Map.of("GIT_REF", "refs/tags/v1.4.0"))).thenReturn(Optional.of("12"));
 
-        assertThat(ciService.startBuild("jenkins:sample-app", Map.of("GIT_REF", "refs/tags/v1.4.0"))).contains("12");
+        assertThat(ciService.startBuild("sample-app", Map.of("GIT_REF", "refs/tags/v1.4.0"))).contains("12");
         verifyNoInteractions(audit);
     }
 
     @Test
-    void startBuildOfUnknownPipelineIsRejected() {
-        assertThatThrownBy(() -> ciService.startBuild("jenkins:other-app", Map.of()))
-                .isInstanceOf(PipelineNotFoundException.class);
+    void startBuildOfUnknownAppIsRejected() {
+        assertThatThrownBy(() -> ciService.startBuild("other-app", Map.of()))
+                .isInstanceOf(AppNotFoundException.class);
     }
 
     @Test
     void triggerBuildRecordsWhoStartedWhichBuild() {
-        when(ci.triggerBuild("sample-app", Map.of())).thenReturn(Optional.of("4"));
+        when(ci.triggerBuild("sample-app-job", Map.of())).thenReturn(Optional.of("4"));
 
-        assertThat(ciService.triggerBuild("jenkins:sample-app", "andy")).contains("4");
+        assertThat(ciService.triggerBuild("sample-app", "andy")).contains("4");
 
-        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app", AuditEntry.ActionResult.SUCCESS,
+        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app", AuditEntry.ActionResult.SUCCESS,
                 "4", null);
     }
 
     @Test
     void triggerBuildStillQueuedIsRecordedWithoutBuildId() {
-        when(ci.triggerBuild("sample-app", Map.of())).thenReturn(Optional.empty());
+        when(ci.triggerBuild("sample-app-job", Map.of())).thenReturn(Optional.empty());
 
-        assertThat(ciService.triggerBuild("jenkins:sample-app", "andy")).isEmpty();
+        assertThat(ciService.triggerBuild("sample-app", "andy")).isEmpty();
 
-        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app", AuditEntry.ActionResult.SUCCESS,
+        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app", AuditEntry.ActionResult.SUCCESS,
                 null, "Queued, but the CI tool hadn't started it yet");
     }
 
     @Test
     void failedTriggerIsRecordedAndRethrown() {
-        when(ci.triggerBuild("sample-app", Map.of())).thenThrow(new CiToolException("Jenkins not reachable"));
+        when(ci.triggerBuild("sample-app-job", Map.of())).thenThrow(new CiToolException("Jenkins not reachable"));
 
-        assertThatThrownBy(() -> ciService.triggerBuild("jenkins:sample-app", "andy")).isInstanceOf(CiToolException.class);
+        assertThatThrownBy(() -> ciService.triggerBuild("sample-app", "andy")).isInstanceOf(CiToolException.class);
 
-        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app", AuditEntry.ActionResult.FAILED,
+        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app", AuditEntry.ActionResult.FAILED,
                 null, "Jenkins not reachable");
     }
 }

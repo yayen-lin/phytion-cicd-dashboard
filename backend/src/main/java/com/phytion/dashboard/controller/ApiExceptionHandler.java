@@ -7,8 +7,6 @@ import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.adapter.release.ReleaseToolException;
 import com.phytion.dashboard.service.AppNotFoundException;
 import com.phytion.dashboard.service.InvalidReleaseException;
-import com.phytion.dashboard.service.PipelineNotFoundException;
-import com.phytion.dashboard.service.RepoNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -51,9 +49,9 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
     }
 
-    /// 404 when requesting an external that isn't configured
-    @ExceptionHandler({PipelineNotFoundException.class, RepoNotFoundException.class, AppNotFoundException.class})
-    public ResponseEntity<Map<String, String>> notConfigured(RuntimeException e) {
+    // 404 when asked about an app that isn't configured
+    @ExceptionHandler(AppNotFoundException.class)
+    public ResponseEntity<Map<String, String>> notConfigured(AppNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
     }
 }

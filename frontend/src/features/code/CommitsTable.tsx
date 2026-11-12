@@ -11,8 +11,8 @@ import CommitLink from './CommitLink'
 import {firstLine} from '@/lib/format'
 
 type Props = {
-  /** e.g. "bitbucket:andy-test-app/sample-app" */
-  repo: string
+  /** e.g. "sample-app" */
+  appId: string
   /** The branch in the address, or null when there is none */
   branch: string | null
   onBranchChange: (branch: string) => void
@@ -24,8 +24,8 @@ function pickBranch(branches: CodeBranch[], wanted: string | null): string | nul
   return [wanted, 'main', 'master'].find((name) => name && names.includes(name)) ?? names[0] ?? null
 }
 
-/** The most recent commits on one branch of a repo, newest first, with a branch selector. */
-function CommitsTable({repo, branch, onBranchChange}: Props) {
+/** The most recent commits on one branch of an app's repo, newest first, with a branch selector. */
+function CommitsTable({appId, branch, onBranchChange}: Props) {
   // null while loading
   const [branches, setBranches] = useState<CodeBranch[] | null>(null)
   // Which branch the commits are from, so switching branches shows the skeleton instead of the old branch's commits
@@ -36,23 +36,23 @@ function CommitsTable({repo, branch, onBranchChange}: Props) {
   const selected = branches ? pickBranch(branches, branch) : null
 
   const loadBranches = useCallback(() => {
-    return getBranches(repo)
+    return getBranches(appId)
       .then((data) => {
         setBranches(data.branches)
         setError('')
       })
       .catch(() => setError('Could not load branches from the code tool'))
-  }, [repo])
+  }, [appId])
 
   const loadCommits = useCallback(() => {
     if (!selected) return Promise.resolve()
-    return getCommits(repo, selected)
+    return getCommits(appId, selected)
       .then((data) => {
         setCommits({branch: selected, commits: data.commits})
         setError('')
       })
       .catch(() => setError('Could not load commits from the code tool'))
-  }, [repo, selected])
+  }, [appId, selected])
 
   useEffect(() => {
     loadBranches()

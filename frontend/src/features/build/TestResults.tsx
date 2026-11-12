@@ -7,8 +7,8 @@ import {formatTestDuration} from '@/lib/format'
 import TestCounts from './TestCounts'
 
 type Props = {
-  /** e.g. "jenkins:sample-app" */
-  pipeline: string
+  /** e.g. "sample-app" */
+  appId: string
   buildId: string
 }
 
@@ -34,16 +34,16 @@ function groupByClass(cases: CiTestCase[]): [string, CiTestCase[]][] {
 }
 
 /** Loads one build's test results and lists every test, grouped by class, failures first. */
-function TestResults({pipeline, buildId}: Props) {
+function TestResults({appId, buildId}: Props) {
   // undefined while loading, null when the build has no test results
   const [report, setReport] = useState<CiTestReport | null | undefined>(undefined)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    getTestReport(pipeline, buildId)
+    getTestReport(appId, buildId)
       .then(setReport)
       .catch(() => setError('Could not load the test results from the CI tool'))
-  }, [pipeline, buildId])
+  }, [appId, buildId])
 
   if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
   if (report === undefined) {

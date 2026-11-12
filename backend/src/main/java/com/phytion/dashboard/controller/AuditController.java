@@ -22,8 +22,8 @@ public class AuditController {
     /**
      * Get most recent entries, newest first.
      *
-     * @param target       e.g. "jenkins:sample-app"
-     * @param actionType   e.g. TRIGGER_BUILD
+     * @param target       the app
+     * @param actionType   an action taken on the dashboard
      * @param username     who took the action
      * @param actionResult SUCCESS or FAILED
      */
