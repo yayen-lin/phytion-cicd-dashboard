@@ -70,7 +70,7 @@ class DockerRegistryReleaseServiceTests {
 
         verify(code).createTag(APP, "v1.4.0", COMMIT);
         verify(audit).add("andy", AuditEntry.ActionType.RELEASE, APP, AuditEntry.ActionResult.SUCCESS, "12",
-                "v1.4.0 on commit a4dad00");
+                "v1.4.0 on commit a4dad00", null, "1.4.0");
     }
 
     @Test
@@ -80,7 +80,7 @@ class DockerRegistryReleaseServiceTests {
         assertThat(releaseService.release(APP, "v1.4.0", COMMIT, "andy")).isEmpty();
 
         verify(audit).add("andy", AuditEntry.ActionType.RELEASE, APP, AuditEntry.ActionResult.SUCCESS, null,
-                "v1.4.0 on commit a4dad00; build queued, but the CI tool hadn't started it yet");
+                "v1.4.0 on commit a4dad00; build queued, but the CI tool hadn't started it yet", null, "1.4.0");
     }
 
     @Test
@@ -93,7 +93,7 @@ class DockerRegistryReleaseServiceTests {
                 .hasMessage("Bitbucket refused the tag: Tag \"v1.4.0\" already exists");
 
         verify(audit).add("andy", AuditEntry.ActionType.RELEASE, APP, AuditEntry.ActionResult.FAILED, null,
-                "v1.4.0 on commit a4dad00: Bitbucket refused the tag: Tag \"v1.4.0\" already exists");
+                "v1.4.0 on commit a4dad00: Bitbucket refused the tag: Tag \"v1.4.0\" already exists", null, "1.4.0");
         verifyNoInteractions(ci);
     }
 
@@ -106,7 +106,7 @@ class DockerRegistryReleaseServiceTests {
                 .hasMessage("Tag v1.4.0 was created, but its build didn't start: Jenkins not reachable");
 
         verify(audit).add("andy", AuditEntry.ActionType.RELEASE, APP, AuditEntry.ActionResult.FAILED, null,
-                "v1.4.0 on commit a4dad00: Tag v1.4.0 was created, but its build didn't start: Jenkins not reachable");
+                "v1.4.0 on commit a4dad00: Tag v1.4.0 was created, but its build didn't start: Jenkins not reachable", null, "1.4.0");
     }
 
     @Test

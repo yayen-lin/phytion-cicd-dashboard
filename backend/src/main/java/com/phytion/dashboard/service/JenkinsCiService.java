@@ -76,12 +76,13 @@ public class JenkinsCiService {
         App app = apps.getApp(appId);
         try {
             Optional<String> buildId = ci.triggerBuild(app.pipeline().job(), Map.of());
-            audit.add(username, AuditEntry.ActionType.TRIGGER_BUILD, app.id(), AuditEntry.ActionResult.SUCCESS,
-                    buildId.orElse(null), buildId.isPresent() ? null : "Queued, but the CI tool hadn't started it yet");
+            audit.add(username, AuditEntry.ActionType.BUILD, app.id(), AuditEntry.ActionResult.SUCCESS,
+                    buildId.orElse(null), buildId.isPresent() ? null : "Queued, but the CI tool hadn't started it yet",
+                    null, null);
             return buildId;
         } catch (CiToolException e) {
-            audit.add(username, AuditEntry.ActionType.TRIGGER_BUILD, app.id(), AuditEntry.ActionResult.FAILED,
-                    null, e.getMessage());
+            audit.add(username, AuditEntry.ActionType.BUILD, app.id(), AuditEntry.ActionResult.FAILED,
+                    null, e.getMessage(), null, null);
             throw e;
         }
     }

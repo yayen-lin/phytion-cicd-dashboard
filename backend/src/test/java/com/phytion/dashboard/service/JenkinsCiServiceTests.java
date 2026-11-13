@@ -16,6 +16,7 @@ import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.config.AppsProperties;
 import com.phytion.dashboard.model.AuditEntry;
+import com.phytion.dashboard.model.AuditFilter;
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.CiPipeline;
@@ -54,7 +55,9 @@ class JenkinsCiServiceTests {
     @Test
     void getBuildStartedThroughTheDashboardShowsTheDashboardUser() {
         when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "dashboard-bot", null)));
-        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.of("andy"));
+        when(audit.getRecentEntries(new AuditFilter("sample-app", AuditEntry.ActionType.BUILD, null, null, "4", null, null)))
+                .thenReturn(List.of(new AuditEntry("andy", AuditEntry.ActionType.BUILD, "sample-app", Instant.now(),
+                        AuditEntry.ActionResult.SUCCESS, "4", null, null, null)));
 
         assertThat(ciService.getBuild("sample-app", "4")).get()
                 .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
@@ -64,7 +67,7 @@ class JenkinsCiServiceTests {
     @Test
     void getBuildStartedOutsideTheDashboardShowsTheCiToolUser() {
         when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "Andy Lin", null)));
-        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.empty());
+        when(audit.getRecentEntries(new AuditFilter("sample-app", AuditEntry.ActionType.BUILD, null, null, "4", null, null))).thenReturn(List.of());
 
         assertThat(ciService.getBuild("sample-app", "4")).get()
                 .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
@@ -74,7 +77,7 @@ class JenkinsCiServiceTests {
     @Test
     void getBuildStartedByNoOneHasNoSource() {
         when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), null, null)));
-        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.empty());
+        when(audit.getRecentEntries(new AuditFilter("sample-app", AuditEntry.ActionType.BUILD, null, null, "4", null, null))).thenReturn(List.of());
 
         assertThat(ciService.getBuild("sample-app", "4")).get()
                 .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
@@ -121,8 +124,8 @@ class JenkinsCiServiceTests {
 
         assertThat(ciService.triggerBuild("sample-app", "andy")).contains("4");
 
-        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app", AuditEntry.ActionResult.SUCCESS,
-                "4", null);
+        verify(audit).add("andy", AuditEntry.ActionType.BUILD, "sample-app", AuditEntry.ActionResult.SUCCESS,
+                "4", null, null, null);
     }
 
     @Test
@@ -131,8 +134,8 @@ class JenkinsCiServiceTests {
 
         assertThat(ciService.triggerBuild("sample-app", "andy")).isEmpty();
 
-        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app", AuditEntry.ActionResult.SUCCESS,
-                null, "Queued, but the CI tool hadn't started it yet");
+        verify(audit).add("andy", AuditEntry.ActionType.BUILD, "sample-app", AuditEntry.ActionResult.SUCCESS,
+                null, "Queued, but the CI tool hadn't started it yet", null, null);
     }
 
     @Test
@@ -141,7 +144,7 @@ class JenkinsCiServiceTests {
 
         assertThatThrownBy(() -> ciService.triggerBuild("sample-app", "andy")).isInstanceOf(CiToolException.class);
 
-        verify(audit).add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app", AuditEntry.ActionResult.FAILED,
-                null, "Jenkins not reachable");
+        verify(audit).add("andy", AuditEntry.ActionType.BUILD, "sample-app", AuditEntry.ActionResult.FAILED,
+                null, "Jenkins not reachable", null, null);
     }
 }

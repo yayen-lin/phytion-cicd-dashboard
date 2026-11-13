@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.code.CodeToolException;
+import com.phytion.dashboard.adapter.operate.OperateToolException;
 import com.phytion.dashboard.adapter.release.ReleaseToolException;
 import com.phytion.dashboard.service.AppNotFoundException;
 import com.phytion.dashboard.service.InvalidDeployException;
@@ -41,6 +42,13 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ReleaseToolException.class)
     public ResponseEntity<Map<String, String>> releaseToolFailed(ReleaseToolException e) {
         log.warn("Release tool request failed", e);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));
+    }
+
+    // 502 when an external tool is down
+    @ExceptionHandler(OperateToolException.class)
+    public ResponseEntity<Map<String, String>> operateToolFailed(OperateToolException e) {
+        log.warn("Operate tool request failed", e);
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));
     }
 

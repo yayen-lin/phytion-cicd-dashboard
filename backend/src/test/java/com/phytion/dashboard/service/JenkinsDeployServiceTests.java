@@ -62,7 +62,7 @@ class JenkinsDeployServiceTests {
         assertThat(deployService.deploy(APP, "1.0.1", "staging", "andy")).contains("3");
 
         verify(audit).add("andy", AuditEntry.ActionType.DEPLOY, APP, AuditEntry.ActionResult.SUCCESS, "3",
-                "1.0.1 to staging");
+                "1.0.1 to staging", "staging", "1.0.1");
     }
 
     @Test
@@ -72,7 +72,7 @@ class JenkinsDeployServiceTests {
         assertThat(deployService.deploy(APP, "1.0.1", "staging", "andy")).isEmpty();
 
         verify(audit).add("andy", AuditEntry.ActionType.DEPLOY, APP, AuditEntry.ActionResult.SUCCESS, null,
-                "1.0.1 to staging; queued, but the CI tool hadn't started it yet");
+                "1.0.1 to staging; queued, but the CI tool hadn't started it yet", "staging", "1.0.1");
     }
 
     @Test
@@ -84,7 +84,7 @@ class JenkinsDeployServiceTests {
                 .hasMessage("Jenkins not reachable");
 
         verify(audit).add("andy", AuditEntry.ActionType.DEPLOY, APP, AuditEntry.ActionResult.FAILED, null,
-                "1.0.1 to staging: Jenkins not reachable");
+                "1.0.1 to staging: Jenkins not reachable", "staging", "1.0.1");
     }
 
     @Test
@@ -95,7 +95,7 @@ class JenkinsDeployServiceTests {
                 .isInstanceOf(ReleaseToolException.class);
 
         verify(audit).add("andy", AuditEntry.ActionType.DEPLOY, APP, AuditEntry.ActionResult.FAILED, null,
-                "1.0.1 to staging: couldn't check the version: Registry not reachable");
+                "1.0.1 to staging: couldn't check the version: Registry not reachable", "staging", "1.0.1");
         verifyNoInteractions(jenkins);
     }
 

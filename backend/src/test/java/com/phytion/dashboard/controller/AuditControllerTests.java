@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 
 import com.phytion.dashboard.model.AuditEntry;
+import com.phytion.dashboard.model.AuditFilter;
 import com.phytion.dashboard.repository.AuditEntryRepository;
 import com.phytion.dashboard.service.AuditService;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,10 +49,10 @@ class AuditControllerTests {
     @Test
     @WithMockUser
     void auditLogIsNewestFirst() throws Exception {
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
-                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null));
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
-                Instant.parse("2026-11-03T11:00:00Z"), AuditEntry.ActionResult.FAILED, null, "Jenkins not reachable"));
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.BUILD, "jenkins:sample-app",
+                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null, null, null));
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.BUILD, "jenkins:sample-app",
+                Instant.parse("2026-11-03T11:00:00Z"), AuditEntry.ActionResult.FAILED, null, "Jenkins not reachable", null, null));
 
         mvc.perform(get("/api/audit"))
                 .andExpect(status().isOk())
@@ -60,28 +61,36 @@ class AuditControllerTests {
                 .andExpect(jsonPath("$[0].createdAt").value("2026-11-03T11:00:00Z"))
                 .andExpect(jsonPath("$[0].details").value("Jenkins not reachable"))
                 .andExpect(jsonPath("$[1].username").value("andy"))
-                .andExpect(jsonPath("$[1].actionType").value("TRIGGER_BUILD"))
+                .andExpect(jsonPath("$[1].actionType").value("BUILD"))
                 .andExpect(jsonPath("$[1].target").value("jenkins:sample-app"))
                 .andExpect(jsonPath("$[1].buildId").value("3"));
     }
 
     @Test
-    void findBuildStarterFindsTheDashboardUserWhoStartedTheBuild() {
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
-                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null));
+    void recentEntriesMatchBuildEnvironmentAndVersionNewestByTimestamp() {
+        // saved out of time order, so the order comes from the timestamp, not the id
+        entries.save(new AuditEntry("sam", AuditEntry.ActionType.DEPLOY, "sample-app",
+                Instant.parse("2026-11-03T12:00:00Z"), AuditEntry.ActionResult.SUCCESS, "5", null, "staging", "1.0.1"));
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.DEPLOY, "sample-app",
+                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null, "staging", "1.0.1"));
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.DEPLOY, "sample-app",
+                Instant.parse("2026-11-03T13:00:00Z"), AuditEntry.ActionResult.SUCCESS, "6", null, "dev", "1.0.1"));
 
-        assertThat(auditService.findBuildStarter("jenkins:sample-app", "3")).contains("andy");
-        assertThat(auditService.findBuildStarter("jenkins:sample-app", "4")).isEmpty();
-        assertThat(auditService.findBuildStarter("jenkins:other-app", "3")).isEmpty();
+        assertThat(auditService.getRecentEntries(new AuditFilter("sample-app", AuditEntry.ActionType.DEPLOY, null,
+                AuditEntry.ActionResult.SUCCESS, null, "staging", "1.0.1")))
+                .extracting(AuditEntry::getBuildId).containsExactly("5", "3");
+        assertThat(auditService.getRecentEntries(new AuditFilter(null, null, null, null, "3", null, null)))
+                .extracting(AuditEntry::getUsername).containsExactly("andy");
+        assertThat(auditService.getRecentEntries(new AuditFilter(null, null, null, null, null, "prod", null))).isEmpty();
     }
 
     @Test
     @WithMockUser
     void auditLogCanBeFilteredByTarget() throws Exception {
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
-                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null));
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:other-app",
-                Instant.parse("2026-11-03T11:00:00Z"), AuditEntry.ActionResult.SUCCESS, "7", null));
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.BUILD, "jenkins:sample-app",
+                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null, null, null));
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.BUILD, "jenkins:other-app",
+                Instant.parse("2026-11-03T11:00:00Z"), AuditEntry.ActionResult.SUCCESS, "7", null, null, null));
 
         mvc.perform(get("/api/audit").param("target", "jenkins:sample-app"))
                 .andExpect(status().isOk())
@@ -92,18 +101,18 @@ class AuditControllerTests {
     @Test
     @WithMockUser
     void auditLogFiltersCombine() throws Exception {
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
-                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null));
-        entries.save(new AuditEntry("andy", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
-                Instant.parse("2026-11-03T11:00:00Z"), AuditEntry.ActionResult.FAILED, null, "Jenkins not reachable"));
-        entries.save(new AuditEntry("sam", AuditEntry.ActionType.TRIGGER_BUILD, "jenkins:sample-app",
-                Instant.parse("2026-11-03T12:00:00Z"), AuditEntry.ActionResult.FAILED, null, "Jenkins not reachable"));
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.BUILD, "jenkins:sample-app",
+                Instant.parse("2026-11-03T10:00:00Z"), AuditEntry.ActionResult.SUCCESS, "3", null, null, null));
+        entries.save(new AuditEntry("andy", AuditEntry.ActionType.BUILD, "jenkins:sample-app",
+                Instant.parse("2026-11-03T11:00:00Z"), AuditEntry.ActionResult.FAILED, null, "Jenkins not reachable", null, null));
+        entries.save(new AuditEntry("sam", AuditEntry.ActionType.BUILD, "jenkins:sample-app",
+                Instant.parse("2026-11-03T12:00:00Z"), AuditEntry.ActionResult.FAILED, null, "Jenkins not reachable", null, null));
 
         mvc.perform(get("/api/audit").param("username", "andy").param("actionResult", "FAILED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].createdAt").value("2026-11-03T11:00:00Z"));
-        mvc.perform(get("/api/audit").param("actionType", "TRIGGER_BUILD"))
+        mvc.perform(get("/api/audit").param("actionType", "BUILD"))
                 .andExpect(jsonPath("$.length()").value(3));
     }
 

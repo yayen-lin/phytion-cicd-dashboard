@@ -31,11 +31,14 @@ public class AuditService {
      * Adds an entry with a timestamp.
      */
     public AuditEntry add(String username, AuditEntry.ActionType actionType, String target,
-                          AuditEntry.ActionResult actionResult, String buildId, String details) {
+                          AuditEntry.ActionResult actionResult, String buildId, String details, String environment,
+                          String version) {
+
         if (details != null && details.length() > detailsMaxLength) {
             details = details.substring(0, detailsMaxLength);
         }
-        return repo.save(new AuditEntry(username, actionType, target, Instant.now(), actionResult, buildId, details));
+        return repo.save(new AuditEntry(username, actionType, target, Instant.now(), actionResult, buildId, details,
+                environment, version));
     }
 
     /**
@@ -43,14 +46,14 @@ public class AuditService {
      */
     public List<AuditEntry> getRecentEntries(AuditFilter filter) {
         return repo.findFiltered(filter.target(), filter.actionType(), filter.username(), filter.actionResult(),
-                Limit.of(maxEntries));
+                filter.buildId(), filter.environment(), filter.version(), Limit.of(maxEntries));
     }
 
     /**
      * Who started a build of a target through the dashboard.
      */
     public Optional<String> findBuildStarter(String target, String buildId) {
-        return repo.findFirstByTargetAndActionTypeAndBuildIdOrderByIdDesc(target, AuditEntry.ActionType.TRIGGER_BUILD,
+        return repo.findFirstByTargetAndActionTypeAndBuildIdOrderByIdDesc(target, AuditEntry.ActionType.BUILD,
                 buildId).map(AuditEntry::getUsername);
     }
 }

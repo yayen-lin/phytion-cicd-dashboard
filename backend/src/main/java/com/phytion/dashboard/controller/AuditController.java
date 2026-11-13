@@ -33,6 +33,7 @@ public class AuditController {
             @RequestParam(required = false) AuditEntry.ActionType actionType,
             @RequestParam(required = false) String username,
             @RequestParam(required = false) AuditEntry.ActionResult actionResult) {
-        return auditService.getRecentEntries(new AuditFilter(target, actionType, username, actionResult));
+        return auditService.getRecentEntries(
+                new AuditFilter(target, actionType, username, actionResult, null, null, null));
     }
 }

@@ -31,8 +31,8 @@ class AuditServiceTests {
     void addTimestampsTheEntry() {
         Instant before = Instant.now();
 
-        AuditEntry entry = auditService.add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app",
-                AuditEntry.ActionResult.SUCCESS, "4", null);
+        AuditEntry entry = auditService.add("andy", AuditEntry.ActionType.BUILD, "sample-app",
+                AuditEntry.ActionResult.SUCCESS, "4", null, null, null);
 
         assertThat(entry.getUsername()).isEqualTo("andy");
         assertThat(entry.getBuildId()).isEqualTo("4");
@@ -40,9 +40,18 @@ class AuditServiceTests {
     }
 
     @Test
+    void addKeepsVersionAndEnvironmentOfADeploy() {
+        AuditEntry entry = auditService.add("andy", AuditEntry.ActionType.DEPLOY, "sample-app",
+                AuditEntry.ActionResult.SUCCESS, "3", "1.0.1 to staging", "staging", "1.0.1");
+
+        assertThat(entry.getVersion()).isEqualTo("1.0.1");
+        assertThat(entry.getEnvironment()).isEqualTo("staging");
+    }
+
+    @Test
     void addCutsLongDetailsToFitTheColumn() {
-        AuditEntry entry = auditService.add("andy", AuditEntry.ActionType.TRIGGER_BUILD, "sample-app",
-                AuditEntry.ActionResult.FAILED, null, "x".repeat(5000));
+        AuditEntry entry = auditService.add("andy", AuditEntry.ActionType.BUILD, "sample-app",
+                AuditEntry.ActionResult.FAILED, null, "x".repeat(5000), null, null);
 
         assertThat(entry.getDetails()).hasSize(1000);
     }

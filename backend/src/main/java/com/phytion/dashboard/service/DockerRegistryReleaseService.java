@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.code.CodeToolException;
+import com.phytion.dashboard.adapter.release.ReleaseToolException;
 import com.phytion.dashboard.adapter.release.dockerregistry.DockerRegistryAdapter;
 import com.phytion.dashboard.adapter.release.dockerregistry.DockerRegistryProperties;
 import com.phytion.dashboard.model.App;
@@ -39,11 +40,11 @@ public class DockerRegistryReleaseService {
     private static final String LABEL_COMMIT = "org.opencontainers.image.revision";
     private static final String LABEL_BUILD = "com.phytionassetmanagement.build-number";
 
-    // The Release stage tags images with the version number of the git tag, e.g. v1.4.0 -> 1.4.0
+    // version tag without the v
     private static final Pattern VERSION_NUMBER = Pattern.compile("(\\d{1,9})\\.(\\d{1,9})\\.(\\d{1,9})");
-
-    // What can be released: a git tag like v1.4.0 on a commit given by its full hash
-    private static final Pattern RELEASE_TAG = Pattern.compile("v\\d{1,9}\\.\\d{1,9}\\.\\d{1,9}");
+    // version tag with the v
+    private static final Pattern RELEASE_TAG = Pattern.compile("v(" + VERSION_NUMBER.pattern() + ")");
+    // commit hash must be 40 chars
     private static final Pattern FULL_COMMIT = Pattern.compile("[0-9a-f]{40}");
 
     // jenkins job parameter
@@ -81,6 +82,18 @@ public class DockerRegistryReleaseService {
     }
 
     /**
+     * Find a release image by version.
+     * Returns empty when the registry has no such version, or the image has no labels.
+     *
+     * @throws AppNotFoundException when no configured app has that id, or the app isn't released
+     * @throws ReleaseToolException when the registry can't be reached
+     */
+    public Optional<ReleaseVersion> findVersion(String appId, String version) {
+        Map<String, String> labels = release.getLabels(getReleaseImage(appId).image(), version);
+        return labels.isEmpty() ? Optional.empty() : Optional.of(toVersion(appId, version, labels));
+    }
+
+    /**
      * Releases a commit of an app as a version and records it
      *
      * @param appId      the name of the repo
@@ -98,14 +111,15 @@ public class DockerRegistryReleaseService {
         // check if appId is valid
         getReleaseImage(appId);
 
-
         // validate the form of tag and commit hash
-        if (tag == null || !RELEASE_TAG.matcher(tag).matches()) {
+        Matcher releaseTag = tag == null ? null : RELEASE_TAG.matcher(tag);
+        if (releaseTag == null || !releaseTag.matches()) {
             throw new InvalidReleaseException("A version looks like v1.4.0, got: " + tag);
         }
         if (commitHash == null || !FULL_COMMIT.matcher(commitHash).matches()) {
             throw new InvalidReleaseException("A commit is given by its full 40-character hash, got: " + commitHash);
         }
+        String version = releaseTag.group(1);
         String auditMessage = tag + " on commit " + commitHash.substring(0, 7);
 
         // create tag
@@ -113,7 +127,7 @@ public class DockerRegistryReleaseService {
             code.createTag(appId, tag, commitHash);
         } catch (CodeToolException e) {
             audit.add(username, AuditEntry.ActionType.RELEASE, appId, AuditEntry.ActionResult.FAILED, null,
-                    auditMessage + ": " + e.getMessage());
+                    auditMessage + ": " + e.getMessage(), null, version);
             throw e;
         }
 
@@ -122,12 +136,12 @@ public class DockerRegistryReleaseService {
             Optional<String> buildId = ci.startBuild(appId, Map.of(GIT_REF, "refs/tags/" + tag));
             String details = buildId.isPresent() ? auditMessage : auditMessage + "; build queued, but the CI tool hadn't started it yet";
             audit.add(username, AuditEntry.ActionType.RELEASE, appId, AuditEntry.ActionResult.SUCCESS,
-                    buildId.orElse(null), details);
+                    buildId.orElse(null), details, null, version);
             return buildId;
         } catch (CiToolException e) {
             String message = "Tag " + tag + " was created, but its build didn't start: " + e.getMessage();
             audit.add(username, AuditEntry.ActionType.RELEASE, appId, AuditEntry.ActionResult.FAILED, null,
-                    auditMessage + ": " + message);
+                    auditMessage + ": " + message, null, version);
             throw new CiToolException(message, e);
         }
     }

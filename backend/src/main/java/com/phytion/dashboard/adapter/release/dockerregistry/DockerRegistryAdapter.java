@@ -9,19 +9,18 @@ import java.util.Map;
 public interface DockerRegistryAdapter {
 
     /**
-     * The tags of an image, in the registry's order (not by version).
+     * The tags of an image, in the registry's order
      *
-     * @param image the image's name in the registry, e.g. "sample-app"
+     * @param image the image's name in the registry
      * @return the tags, or an empty list when nothing was pushed under that name yet
      */
     List<String> listTags(String image);
 
     /**
-     * The labels an image version was built with (docker build --label), e.g.
-     * "org.opencontainers.image.revision" -> the commit.
+     * The labels an image version was built with
      *
-     * @param image the image's name in the registry, e.g. "sample-app"
-     * @param tag   e.g. "1.4.0"
+     * @param image the image's name in the registry
+     * @param tag   version tag
      * @return the labels, or an empty map when the registry has no such tag or the image has no labels
      */
     Map<String, String> getLabels(String image, String tag);

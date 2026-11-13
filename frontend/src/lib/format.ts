@@ -1,4 +1,4 @@
-/** An audit log action: "TRIGGER_BUILD" -> "Trigger build" */
+/** An audit log action: "BUILD" -> "Build" */
 export function formatActionType(actionType: string): string {
   const words = actionType.toLowerCase().replaceAll('_', ' ')
   return words.charAt(0).toUpperCase() + words.slice(1)

@@ -22,7 +22,7 @@ public class AuditEntry {
 
     // action enums
     public enum ActionType {
-        TRIGGER_BUILD,
+        BUILD,
         RELEASE,
         DEPLOY
     }
@@ -41,15 +41,16 @@ public class AuditEntry {
     private Instant createdAt;
     private String buildId;
     private String details;
+    private String environment;
+    private String version;
 
     @Enumerated(EnumType.STRING)
     private ActionType actionType;
     @Enumerated(EnumType.STRING)
     private ActionResult actionResult;
 
-    // No id: the database assigns it
-    public AuditEntry(String username, ActionType actionType, String target, Instant createdAt, ActionResult actionResult,
-                      String buildId, String details) {
+    public AuditEntry(String username, ActionType actionType, String target, Instant createdAt,
+                      ActionResult actionResult, String buildId, String details, String environment, String version) {
         this.username = username;
         this.actionType = actionType;
         this.target = target;
@@ -57,5 +58,7 @@ public class AuditEntry {
         this.actionResult = actionResult;
         this.buildId = buildId;
         this.details = details;
+        this.environment = environment;
+        this.version = version;
     }
 }

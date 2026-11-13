@@ -33,8 +33,8 @@ public class JenkinsDeployService {
      * Starts the deploy job for a released version and records it
      *
      * @param appId       the name of the app
-     * @param version     a version in the registry, e.g. "1.0.1"
-     * @param environment one of the configured environments, e.g. "staging"
+     * @param version     a version in the registry
+     * @param environment one of the configured environments
      * @param username    who deploys it
      * @return the deploy build's id, or empty when the CI tool hasn't started the build yet
      * @throws InvalidDeployException when no app is given, the environment doesn't exist or the version isn't released
@@ -65,7 +65,7 @@ public class JenkinsDeployService {
             }
         } catch (ReleaseToolException e) {
             audit.add(username, AuditEntry.ActionType.DEPLOY, appId, AuditEntry.ActionResult.FAILED, null,
-                    auditMessage + ": couldn't check the version: " + e.getMessage());
+                    auditMessage + ": couldn't check the version: " + e.getMessage(), environment, version);
             throw e;
         }
 
@@ -77,11 +77,11 @@ public class JenkinsDeployService {
                     ? auditMessage
                     : auditMessage + "; queued, but the CI tool hadn't started it yet";
             audit.add(username, AuditEntry.ActionType.DEPLOY, appId, AuditEntry.ActionResult.SUCCESS,
-                    buildId.orElse(null), details);
+                    buildId.orElse(null), details, environment, version);
             return buildId;
         } catch (CiToolException e) {
             audit.add(username, AuditEntry.ActionType.DEPLOY, appId, AuditEntry.ActionResult.FAILED, null,
-                    auditMessage + ": " + e.getMessage());
+                    auditMessage + ": " + e.getMessage(), environment, version);
             throw e;
         }
     }
