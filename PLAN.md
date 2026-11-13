@@ -182,17 +182,59 @@ Decisions:
       backend creates the tag through Bitbucket's API (one repository access token per repo, with
       Repositories: Write, in `backend/.env`; reading stays anonymous), starts the tag build, and
       records `RELEASE`, also when it fails, with the reason
-- [ ] 2.2 Environments: turn on Kubernetes in Docker Desktop; namespaces `dev`, `staging`, `prod`;
-      each app keeps its Kubernetes files in its repo (`deploy/`), with one overlay per environment
-      for what differs (e.g. replicas, settings). Check Kubernetes can pull from the local registry
-- [ ] 2.3 Deploy: a Jenkins deploy job (parameters: version, environment) that applies the app's
-      `deploy/` files with that image version; Jenkins gets `kubectl` and access to the cluster.
-      Dashboard: "Deploy" button (pick a version and an environment) that triggers the job and
-      records `DEPLOY` in the audit log
+- [x] 2.2 Environments: Kubernetes on in Docker Desktop (kubeadm), Helm installed; namespaces
+      `dev`, `staging`, `prod` (`kubectl create namespace`). `sample-app` and `dummy-app` got Spring
+      Actuator with the readiness and liveness endpoints turned on. Each app keeps a Helm chart in
+      its repo (`deploy/`): a Deployment (startup, liveness and readiness probes on
+      `/actuator/health/...`, `APP_ENVIRONMENT`) and a Service, defaults in `values.yaml`, and one
+      values file per environment for what differs (dev and staging: 1 replica, 512Mi; prod: 2
+      replicas, 1Gi). The version is given at deploy time (`--set image.tag=1.0.1`). Checked by
+      installing `sample-app:1.0.1` into `dev` from the local registry: its pod became ready
+- [ ] 2.3 Deploy: a Jenkins deploy job (parameters: version, environment) that runs
+      `helm upgrade --install` with the app's `deploy/` chart and that image version; Jenkins gets
+      `helm` and access to the cluster. Dashboard: "Deploy" button (pick a version and an
+      environment) that triggers the job and records `DEPLOY` in the audit log
+  - [x] 1. Helm in the Jenkins image (`jenkins/Dockerfile`), rebuild the container, check
+           `helm version` inside it
+  - [x] 2. Cluster access for Jenkins: a service account `jenkins-deployer` allowed to deploy only
+           in `dev`, `staging` and `prod`; a kubeconfig with its token that reaches the cluster from
+           inside the container (`host.docker.internal:6443`, not `127.0.0.1`), stored as a Jenkins
+           credential. Check with `helm list -n dev` from a test job
+  - [x] 3. Deploy pipeline: `Jenkinsfile.deploy` in each app (parameters `VERSION`, `ENVIRONMENT`):
+           checks out the tag `v<VERSION>` so the chart matches the version, then
+           `helm upgrade --install <app> ./deploy -n <env> -f deploy/values-<env>.yaml
+           --set image.tag=<VERSION> --wait`, so the job fails when the pods don't get ready.
+           Jenkins jobs `sample-app-deploy` and `dummy-app-deploy`. Check by running one from
+           Jenkins' UI (e.g. `sample-app` 1.0.1 to `staging`). 
+  - [x] 4. Backend: each app's deploy job in `application.properties` (`deploy.tool`,
+           `deploy.job`) and the environments list; a deploy service that checks the version is
+           in the registry and the environment exists, triggers the job with the Jenkins adapter,
+           and records `DEPLOY` (also when it fails, with the reason); a POST endpoint; tests
+  - [ ] 5. Environment-first layout, before any new frontend: pages per environment and per app
+           instead of per stage, reusing today's tables and dialogs. Sidebar: Overview, `dev`,
+           `staging`, `prod`, Apps, History
+    - Overview: one card per environment (how many apps, how many healthy, latest deploy)
+    - Environment page (`/environments/<env>`): one row per app running there (version, health,
+      deployed when and by whom); a row's actions dropdown: Deploy a version, Promote to the next
+      environment, Rollback. Clicking a row opens the app page
+    - Apps page (`/apps`): one row per app (latest build, latest version, what runs in each
+      environment); a row's actions dropdown: Run build (build + test), Release, Deploy (pick an
+      environment and a version; also how an app gets into an environment the first time).
+      Clicking a row opens the app page
+    - App page (`/apps/<app>`): tabs for Commits, Builds (with tests), Versions and Environments.
+      Clicking a commit row tags it, which is the release: the same dialog as the Release action
+    - Tagging a commit is releasing (`v1.0.2` makes Jenkins build image `1.0.2`); deploying is
+      picking which version (tag) goes into an environment
+  - [ ] 6. Frontend: one Deploy dialog (pick a version from the registry, and the environment when
+           opened from the Apps page), opened from the Apps page's Deploy action and the environment
+           page's "Deploy a version"; then shows the started deploy build with a link to Jenkins
+  - [ ] 7. Check end to end: deploy from the dashboard, see the pods in `kubectl get pods -n <env>`
+           and the `DEPLOY` entry on the History page
 - [ ] 2.4 Environment overview (Deploy page): read-only Kubernetes adapter; a grid of apps x
       environments showing the running version, its commit, whether it's healthy (ready pods),
       and when and by whom it was deployed (from the audit log)
 - [ ] 2.5 Promotion: "Promote" moves the exact version running in dev to staging, or staging to
       prod. Prod asks "are you sure?" (type the environment name to confirm). Recorded as `PROMOTE`
-- [ ] 2.6 Rollback: redeploy the version that ran before in that environment, through the same
-      Jenkins deploy job. Confirmation for prod; recorded as `ROLLBACK`
+- [ ] 2.6 Rollback: go back to the version that ran before in that environment, with
+      `helm rollback` (Helm keeps each install's history) run by a Jenkins job. Confirmation for
+      prod; recorded as `ROLLBACK`

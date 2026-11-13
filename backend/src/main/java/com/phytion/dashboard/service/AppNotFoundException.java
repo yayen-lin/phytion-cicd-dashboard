@@ -14,4 +14,9 @@ public class AppNotFoundException extends RuntimeException {
     public static AppNotFoundException noRelease(String appId) {
         return new AppNotFoundException(appId, "release");
     }
+
+    /** @param appId an app that is configured, but isn't deployed */
+    public static AppNotFoundException noDeploy(String appId) {
+        return new AppNotFoundException(appId, "deploy");
+    }
 }

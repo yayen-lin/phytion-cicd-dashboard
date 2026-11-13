@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.phytion.dashboard.model.App;
 import com.phytion.dashboard.model.CiPipeline;
+import com.phytion.dashboard.model.DeployJob;
 import com.phytion.dashboard.model.ReleaseImage;
 import com.phytion.dashboard.service.AppService;
 import lombok.RequiredArgsConstructor;
@@ -24,11 +25,13 @@ public class AppController {
     /**
      * @param id      the name of the app
      * @param release null when the app isn't released
+     * @param deploy  null when the app isn't deployed
      */
-    public record AppResponse(String id, RepoResponse repo, CiPipeline pipeline, ReleaseImage release) {
+    public record AppResponse(String id, RepoResponse repo, CiPipeline pipeline, ReleaseImage release,
+                              DeployJob deploy) {
         AppResponse(App app) {
             this(app.id(), new RepoResponse(app.repo().tool(), app.repo().workspace(), app.repo().name()),
-                    app.pipeline(), app.release());
+                    app.pipeline(), app.release(), app.deploy());
         }
     }
 

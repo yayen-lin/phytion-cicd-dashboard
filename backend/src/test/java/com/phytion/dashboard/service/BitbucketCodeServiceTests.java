@@ -100,6 +100,6 @@ class BitbucketCodeServiceTests {
     }
 
     private static AppsProperties.AppSettings app(CodeRepo repo) {
-        return new AppsProperties.AppSettings(repo, new CiPipeline("jenkins", repo.name()), null);
+        return new AppsProperties.AppSettings(repo, new CiPipeline("jenkins", repo.name()), null, null);
     }
 }

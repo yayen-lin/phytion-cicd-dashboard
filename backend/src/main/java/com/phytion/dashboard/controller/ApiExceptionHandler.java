@@ -6,6 +6,7 @@ import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.adapter.release.ReleaseToolException;
 import com.phytion.dashboard.service.AppNotFoundException;
+import com.phytion.dashboard.service.InvalidDeployException;
 import com.phytion.dashboard.service.InvalidReleaseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,12 @@ public class ApiExceptionHandler {
     // 400 when a release is asked for with a bad version or commit
     @ExceptionHandler(InvalidReleaseException.class)
     public ResponseEntity<Map<String, String>> invalidRelease(InvalidReleaseException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+    }
+
+    // 400 when a deploy is asked for with a version that isn't released or an environment that doesn't exist
+    @ExceptionHandler(InvalidDeployException.class)
+    public ResponseEntity<Map<String, String>> invalidDeploy(InvalidDeployException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
     }
 

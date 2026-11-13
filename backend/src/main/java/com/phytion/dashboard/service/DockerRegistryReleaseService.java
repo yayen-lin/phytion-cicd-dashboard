@@ -46,7 +46,7 @@ public class DockerRegistryReleaseService {
     private static final Pattern RELEASE_TAG = Pattern.compile("v\\d{1,9}\\.\\d{1,9}\\.\\d{1,9}");
     private static final Pattern FULL_COMMIT = Pattern.compile("[0-9a-f]{40}");
 
-    // The Jenkins job parameter that says what to build (see the Release stage in each app's Jenkinsfile)
+    // jenkins job parameter
     private static final String GIT_REF = "GIT_REF";
 
     private static final Comparator<String> NEWEST_FIRST = Comparator
@@ -67,6 +67,17 @@ public class DockerRegistryReleaseService {
                 .limit(registryProperties.maxVersions())
                 .map(tag -> toVersion(appId, tag, release.getLabels(image.image(), tag)))
                 .toList();
+    }
+
+    /**
+     * Whether a version of an app is in the registry.
+     *
+     * @param appId   the name of the app
+     * @param version the image tag
+     * @throws AppNotFoundException when no configured app has that id, or the app isn't released
+     */
+    public boolean hasVersion(String appId, String version) {
+        return version != null && release.listTags(getReleaseImage(appId).image()).contains(version);
     }
 
     /**

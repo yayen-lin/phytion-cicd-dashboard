@@ -39,7 +39,7 @@ class JenkinsCiServiceTests {
         // The job's name differs from the app id, to show which one goes where
         ciService = new JenkinsCiService(ci, audit, new AppService(new AppsProperties(Map.of("sample-app",
                 new AppsProperties.AppSettings(new CodeRepo("bitbucket", "andy-test-app", "sample-app", null),
-                        new CiPipeline("jenkins", "sample-app-job"), null)))));
+                        new CiPipeline("jenkins", "sample-app-job"), null, null)))));
     }
 
     @Test

@@ -42,8 +42,8 @@ class DockerRegistryReleaseServiceTests {
     private static final CodeRepo REPO = new CodeRepo("bitbucket", "andy-test-app", "sample-app", null);
     private static final CiPipeline PIPELINE = new CiPipeline("jenkins", "sample-app");
     private static final AppsProperties APPS = new AppsProperties(Map.of(
-            APP, new AppsProperties.AppSettings(REPO, PIPELINE, new ReleaseImage("docker-registry", IMAGE)),
-            "unreleased-app", new AppsProperties.AppSettings(REPO, PIPELINE, null)));
+            APP, new AppsProperties.AppSettings(REPO, PIPELINE, new ReleaseImage("docker-registry", IMAGE), null),
+            "unreleased-app", new AppsProperties.AppSettings(REPO, PIPELINE, null, null)));
     private static final Map<String, String> TAG_BUILD = Map.of("GIT_REF", "refs/tags/v1.4.0");
 
     private DockerRegistryAdapter release;
@@ -207,6 +207,16 @@ class DockerRegistryReleaseServiceTests {
         assertThat(releaseService.listVersions(APP)).extracting(ReleaseVersion::version)
                 .containsExactly("0.3.0", "0.2.0");
         verify(release, never()).getLabels(IMAGE, "0.1.0");
+    }
+
+    @Test
+    void hasVersionIsTrueOnlyForATagInTheRegistry() {
+        when(release.listTags(IMAGE)).thenReturn(List.of("1.0.0", "1.0.1"));
+
+        assertThat(releaseService.hasVersion(APP, "1.0.1")).isTrue();
+        assertThat(releaseService.hasVersion(APP, "1.0.2")).isFalse();
+        assertThat(releaseService.hasVersion(APP, "v1.0.1")).isFalse();
+        assertThat(releaseService.hasVersion(APP, null)).isFalse();
     }
 
     @Test

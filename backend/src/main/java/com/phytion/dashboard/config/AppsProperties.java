@@ -7,6 +7,7 @@ import java.util.Map;
 import com.phytion.dashboard.model.App;
 import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.CodeRepo;
+import com.phytion.dashboard.model.DeployJob;
 import com.phytion.dashboard.model.ReleaseImage;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -27,7 +28,8 @@ public record AppsProperties(Map<String, @Valid AppSettings> apps) {
                         e.getKey(),
                         e.getValue().repo(),
                         e.getValue().pipeline(),
-                        e.getValue().release()))
+                        e.getValue().release(),
+                        e.getValue().deploy()))
                 .toList();
     }
 
@@ -35,10 +37,12 @@ public record AppsProperties(Map<String, @Valid AppSettings> apps) {
      * An app's settings.
      *
      * @param release optional
+     * @param deploy  optional
      */
     public record AppSettings(
             @NotNull @Valid CodeRepo repo,
             @NotNull @Valid CiPipeline pipeline,
-            @Valid ReleaseImage release) {
+            @Valid ReleaseImage release,
+            @Valid DeployJob deploy) {
     }
 }

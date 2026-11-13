@@ -29,13 +29,21 @@ class AppsPropertiesTests {
             .withUserConfiguration(Config.class);
 
     @Test
-    void appWithoutReleaseIsReadWithNullRelease() {
+    void appWithoutReleaseOrDeployIsReadWithNulls() {
         runner.withPropertyValues(SAMPLE_APP).run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(AppsProperties.class).list())
-                    .extracting(App::id, App::release)
-                    .containsExactly(tuple("sample-app", null));
+                    .extracting(App::id, App::release, App::deploy)
+                    .containsExactly(tuple("sample-app", null, null));
         });
+    }
+
+    @Test
+    void deployWithoutJobStopsStartup() {
+        runner.withPropertyValues(SAMPLE_APP)
+                .withPropertyValues("dashboard.apps.sample-app.deploy.tool=jenkins")
+                .run(context -> assertThat(context).hasFailed()
+                        .getFailure().rootCause().hasMessageContaining("deploy.job"));
     }
 
     @Test

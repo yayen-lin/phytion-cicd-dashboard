@@ -23,7 +23,8 @@ public class AuditEntry {
     // action enums
     public enum ActionType {
         TRIGGER_BUILD,
-        RELEASE
+        RELEASE,
+        DEPLOY
     }
 
     public enum ActionResult {

@@ -6,3 +6,5 @@
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
+# personal Claude Code settings
+.claude/settings.local.json
