@@ -5,8 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 /**
  * An app's CI pipeline, and the external tool that runs and hosts it.
  *
- * @param tool which CI tool runs the pipeline, e.g. "jenkins"
- * @param job  the job's name in that tool, e.g. "sample-app"
+ * @param tool the external ci tool that runs the pipeline
+ * @param job  the name of the job in that tool
  */
 public record CiPipeline(@NotBlank String tool, @NotBlank String job) {
 }
