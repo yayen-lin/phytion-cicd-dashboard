@@ -36,14 +36,6 @@ export type CiTestReport = {
   cases: CiTestCase[]
 }
 
-/** Returns a build's test results, or null when it has none (e.g. it stopped before the tests). */
-export async function getTestReport(appId: string, buildId: string): Promise<CiTestReport | null> {
-  const res = await checkLogin(fetch(`/api/ci/builds/${encodeURIComponent(buildId)}/tests?${new URLSearchParams({ appId })}`))
-  if (res.status === 404) return null
-  if (!res.ok) throw new Error(`GET /api/ci/builds/${buildId}/tests failed: ${res.status}`)
-  return res.json()
-}
-
 export type CiBuilds = {
   app: string
   builds: CiBuild[]
@@ -63,9 +55,11 @@ export type CiBuildDetails = {
   startedBy: string | null
   /** Where startedBy comes from: "dashboard", or the CI tool's id (e.g. "jenkins"); null when no one started it */
   startedBySource: string | null
+  /** Every test's result; null when the build has none (still running, or it stopped before the tests) */
+  testReport: CiTestReport | null
 }
 
-/** Returns one build of an app's pipeline. */
+/** Returns one build of an app's pipeline with who started it and its test results. */
 export async function getBuild(appId: string, buildId: string): Promise<CiBuildDetails> {
   const res = await checkLogin(fetch(`/api/ci/builds/${encodeURIComponent(buildId)}?${new URLSearchParams({ appId })}`))
   if (!res.ok) throw new Error(`GET /api/ci/builds/${buildId} failed: ${res.status}`)

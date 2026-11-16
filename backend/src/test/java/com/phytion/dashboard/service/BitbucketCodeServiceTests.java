@@ -3,10 +3,12 @@ package com.phytion.dashboard.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -14,6 +16,9 @@ import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.adapter.code.bitbucket.BitbucketAdapter;
 import com.phytion.dashboard.config.AppsProperties;
 import com.phytion.dashboard.model.CiPipeline;
+import com.phytion.dashboard.model.CodeBranch;
+import com.phytion.dashboard.model.CodeBranchCommits;
+import com.phytion.dashboard.model.CodeCommit;
 import com.phytion.dashboard.model.CodeRepo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +27,11 @@ import org.junit.jupiter.api.Test;
  * Tests the code logic with a fake code tool: no Spring.
  */
 class BitbucketCodeServiceTests {
+
+    private static final String WORKSPACE = "andy-test-app";
+    private static final String REPO = "sample-app";
+    private static final CodeCommit COMMIT = new CodeCommit("cc99f6b", "sample app initial commit", "Andy Lin",
+            Instant.parse("2026-11-03T22:11:13Z"), "https://bitbucket.org/andy-test-app/sample-app/commits/cc99f6b");
 
     private BitbucketAdapter code;
     private BitbucketCodeService codeService;
@@ -71,12 +81,63 @@ class BitbucketCodeServiceTests {
     }
 
     @Test
-    void listCommitsAsksTheToolForTheRepoAndBranch() {
-        when(code.listCommits("andy-test-app", "sample-app", "main")).thenReturn(List.of());
+    void listBranchCommitsShowsTheWantedBranch() {
+        when(code.listBranches(WORKSPACE, REPO)).thenReturn(List.of(branch("dev"), branch("main")));
+        when(code.listCommits(WORKSPACE, REPO, "dev")).thenReturn(List.of(COMMIT));
 
-        assertThat(codeService.listCommits("sample-app", "main")).isEmpty();
+        assertThat(codeService.listBranchCommits("sample-app", "dev"))
+                .isEqualTo(new CodeBranchCommits(List.of(branch("dev"), branch("main")), "dev", List.of(COMMIT)));
+        verify(code, times(1)).listCommits(WORKSPACE, REPO, "dev");
+    }
 
-        verify(code).listCommits("andy-test-app", "sample-app", "main");
+    @Test
+    void listBranchCommitsWithoutABranchShowsMain() {
+        when(code.listBranches(WORKSPACE, REPO)).thenReturn(List.of(branch("dev"), branch("main")));
+        when(code.listCommits(WORKSPACE, REPO, "main")).thenReturn(List.of(COMMIT));
+
+        assertThat(codeService.listBranchCommits("sample-app", null).branch()).isEqualTo("main");
+        verify(code, times(1)).listCommits(WORKSPACE, REPO, "main");
+    }
+
+    @Test
+    void listBranchCommitsOfAGoneBranchShowsMainInstead() {
+        when(code.listBranches(WORKSPACE, REPO)).thenReturn(List.of(branch("dev"), branch("main")));
+        when(code.listCommits(WORKSPACE, REPO, "gone")).thenThrow(new CodeToolException("Bitbucket answered 404"));
+        when(code.listCommits(WORKSPACE, REPO, "main")).thenReturn(List.of(COMMIT));
+
+        CodeBranchCommits result = codeService.listBranchCommits("sample-app", "gone");
+
+        assertThat(result.branch()).isEqualTo("main");
+        assertThat(result.commits()).containsExactly(COMMIT);
+    }
+
+    @Test
+    void listBranchCommitsWithoutMainOrMasterShowsTheNewestBranch() {
+        when(code.listBranches(WORKSPACE, REPO)).thenReturn(List.of(branch("dev"), branch("feature-x")));
+        when(code.listCommits(WORKSPACE, REPO, "dev")).thenReturn(List.of(COMMIT));
+
+        assertThat(codeService.listBranchCommits("sample-app", null).branch()).isEqualTo("dev");
+    }
+
+    @Test
+    void listBranchCommitsOfARepoWithoutBranchesHasNoBranchOrCommits() {
+        when(code.listBranches(WORKSPACE, REPO)).thenReturn(List.of());
+        when(code.listCommits(WORKSPACE, REPO, "main")).thenThrow(new CodeToolException("Bitbucket answered 404"));
+
+        assertThat(codeService.listBranchCommits("sample-app", null))
+                .isEqualTo(new CodeBranchCommits(List.of(), null, List.of()));
+    }
+
+    @Test
+    void listBranchCommitsFailsWhenTheBranchesCanNotBeRead() {
+        when(code.listBranches(WORKSPACE, REPO)).thenThrow(new CodeToolException("Bitbucket not reachable"));
+
+        assertThatThrownBy(() -> codeService.listBranchCommits("sample-app", null))
+                .isInstanceOf(CodeToolException.class);
+    }
+
+    private static CodeBranch branch(String name) {
+        return new CodeBranch(name, null, "https://bitbucket.org/andy-test-app/sample-app/branch/" + name);
     }
 
     @Test
@@ -91,7 +152,7 @@ class BitbucketCodeServiceTests {
     void unknownAppIsRejected() {
         assertThatThrownBy(() -> codeService.listBranches("other-app"))
                 .isInstanceOf(AppNotFoundException.class);
-        assertThatThrownBy(() -> codeService.listCommits("other-app", "main"))
+        assertThatThrownBy(() -> codeService.listBranchCommits("other-app", "main"))
                 .isInstanceOf(AppNotFoundException.class);
         assertThatThrownBy(() -> codeService.getCommitUrl("other-app", "a4dad00"))
                 .isInstanceOf(AppNotFoundException.class);

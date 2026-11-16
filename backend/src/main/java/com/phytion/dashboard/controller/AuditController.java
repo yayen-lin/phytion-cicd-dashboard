@@ -27,6 +27,7 @@ public class AuditController {
      * @param username     who took the action
      * @param actionResult SUCCESS or FAILED
      */
+    // UNUSED: no frontend view calls this since 5.7 (the History page uses /api/history); kept for review
     @GetMapping("/api/audit")
     public List<AuditEntry> recentEntries(
             @RequestParam(required = false) String target,

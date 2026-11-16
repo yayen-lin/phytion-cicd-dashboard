@@ -1,19 +1,25 @@
 package com.phytion.dashboard.service;
 
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
+import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.operate.OperateToolException;
 import com.phytion.dashboard.adapter.operate.kubernetes.KubernetesAdapter;
 import com.phytion.dashboard.adapter.release.ReleaseToolException;
 import com.phytion.dashboard.config.EnvironmentsProperties;
 import com.phytion.dashboard.model.App;
-import com.phytion.dashboard.model.AuditEntry;
-import com.phytion.dashboard.model.AuditFilter;
+import com.phytion.dashboard.model.CiBuild;
+import com.phytion.dashboard.model.DeployRun;
 import com.phytion.dashboard.model.EnvironmentApp;
 import com.phytion.dashboard.model.EnvironmentStatus;
 import com.phytion.dashboard.model.OperateWorkload;
@@ -23,10 +29,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-/**
- * What runs in each environment: read from Kubernetes (one namespace per environment), with the commit from the
- * registry and who deployed it from the audit log.
- */
+import static com.phytion.dashboard.service.ParallelCalls.await;
+
 @Service
 @RequiredArgsConstructor
 public class KubernetesEnvironmentService {
@@ -35,13 +39,12 @@ public class KubernetesEnvironmentService {
 
     private final KubernetesAdapter kubernetes;
     private final DockerRegistryReleaseService releases;
-    private final AuditService audit;
+    private final JenkinsDeployService deployService;
     private final AppService apps;
     private final EnvironmentsProperties environments;
 
     /**
-     * Every environment with every deployable app in it, optionally narrowed to one environment or one app.
-     * e.g. ("staging", null) -> [staging: sample-app 1.0.1 healthy, dummy-app not deployed]
+     * Returns evironments with its app.
      *
      * @param environment one of the configured environments, or null for all
      * @param appId       the name of an app, or null for all deployable apps
@@ -75,17 +78,53 @@ public class KubernetesEnvironmentService {
             pickedApps = List.of(app);
         }
 
-        // read each environment; a version running in several environments is looked up in the registry once
-        Map<String, Optional<ReleaseVersion>> versionsSeen = new HashMap<>();
-        return pickedEnvironments.stream()
-                .map(env -> {
-                    Map<String, OperateWorkload> workloads = kubernetes.listWorkloads(env).stream()
-                            .collect(Collectors.toMap(OperateWorkload::name, Function.identity(), (a, b) -> a));
-                    List<EnvironmentApp> rows = pickedApps.stream()
-                            .map(app -> toEnvironmentApp(app, env, workloads.get(app.id()), versionsSeen))
-                            .toList();
-                    return new EnvironmentStatus(env, rows);
-                })
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+
+            // read each app's deploys once for all environments
+            Map<String, CompletableFuture<List<DeployRun>>> deployReads = pickedApps.stream()
+                    .collect(Collectors.toMap(App::id,
+                            app -> CompletableFuture.supplyAsync(() -> readDeploys(app), executor)));
+
+            // read every environment's workloads
+            List<CompletableFuture<Map<String, OperateWorkload>>> workloadReads = pickedEnvironments.stream()
+                    .map(env -> CompletableFuture.supplyAsync(() -> kubernetes.listWorkloads(env).stream()
+                            .collect(Collectors.toMap(OperateWorkload::name, Function.identity(), (a, b) -> a)),
+                            executor))
+                    .toList();
+
+            // as each environment arrives, look up all its apps
+            Map<String, CompletableFuture<Optional<ReleaseVersion>>> versionReads = new ConcurrentHashMap<>();
+            List<List<CompletableFuture<EnvironmentApp>>> rowReads = IntStream.range(0, pickedEnvironments.size())
+                    .mapToObj(i -> {
+                        String env = pickedEnvironments.get(i);
+                        Map<String, OperateWorkload> workloads = await(workloadReads.get(i));
+                        return pickedApps.stream()
+                                .map(app -> CompletableFuture.supplyAsync(() -> toEnvironmentApp(app, env,
+                                        workloads.get(app.id()), versionReads, deployReads.get(app.id()), executor),
+                                        executor))
+                                .toList();
+                    })
+                    .toList();
+
+            // wait for every row and the deploys
+            List<DeployRun> deploys = pickedApps.stream()
+                    .flatMap(app -> await(deployReads.get(app.id())).stream())
+                    .toList();
+            return IntStream.range(0, pickedEnvironments.size())
+                    .mapToObj(i -> new EnvironmentStatus(pickedEnvironments.get(i),
+                            rowReads.get(i).stream().map(ParallelCalls::await).toList(),
+                            runningDeploys(deploys, pickedEnvironments.get(i))))
+                    .toList();
+        }
+    }
+
+    /**
+     * The deploy builds to an environment still running, newest first.
+     */
+    private static List<DeployRun> runningDeploys(List<DeployRun> deploys, String environment) {
+        return deploys.stream()
+                .filter(run -> run.environment().equals(environment) && run.build().status() == CiBuild.Status.RUNNING)
+                .sorted(Comparator.comparing((DeployRun run) -> run.build().startedAt()).reversed())
                 .toList();
     }
 
@@ -93,22 +132,27 @@ public class KubernetesEnvironmentService {
      * One app in one environment; not deployed when there's no workload for it.
      */
     private EnvironmentApp toEnvironmentApp(App app, String environment, OperateWorkload workload,
-                                            Map<String, Optional<ReleaseVersion>> versionsSeen) {
+                                            Map<String, CompletableFuture<Optional<ReleaseVersion>>> versionReads,
+                                            CompletableFuture<List<DeployRun>> deployRead,
+                                            ExecutorService executor) {
         if (workload == null) {
             return EnvironmentApp.notDeployed(app.id());
         }
         String version = workload.version();
 
         // commit of the running version
-        Optional<ReleaseVersion> release = version == null
-                ? Optional.empty()
-                : versionsSeen.computeIfAbsent(app.id() + ":" + version, key -> findRelease(app, version));
+        CompletableFuture<Optional<ReleaseVersion>> releaseRead = version == null
+                ? CompletableFuture.completedFuture(Optional.empty())
+                : versionReads.computeIfAbsent(app.id() + ":" + version,
+                        key -> CompletableFuture.supplyAsync(() -> findRelease(app, version), executor));
 
-        // who deployed it
-        Optional<AuditEntry> deploy = version == null
+        // the newest deploy build of this version to here: who deployed it and when
+        Optional<DeployRun> deploy = version == null
                 ? Optional.empty()
-                : audit.getRecentEntries(new AuditFilter(app.id(), AuditEntry.ActionType.DEPLOY, null,
-                        AuditEntry.ActionResult.SUCCESS, null, environment, version)).stream().findFirst();
+                : await(deployRead).stream()
+                        .filter(run -> run.environment().equals(environment) && run.version().equals(version))
+                        .findFirst();
+        Optional<ReleaseVersion> release = await(releaseRead);
 
         boolean healthy = workload.desiredPods() > 0 && workload.readyPods() >= workload.desiredPods();
         return new EnvironmentApp(
@@ -119,9 +163,21 @@ public class KubernetesEnvironmentService {
                 workload.desiredPods(),
                 workload.readyPods(),
                 healthy,
-                deploy.map(AuditEntry::getCreatedAt).orElse(null),
-                deploy.map(AuditEntry::getUsername).orElse(null),
-                deploy.map(AuditEntry::getBuildId).orElse(null));
+                deploy.map(run -> run.build().startedAt()).orElse(null),
+                deploy.map(DeployRun::deployedBy).orElse(null),
+                deploy.map(run -> run.build().id()).orElse(null));
+    }
+
+    /**
+     * The app's recent deploys, or none when the CI tool is down.
+     */
+    private List<DeployRun> readDeploys(App app) {
+        try {
+            return deployService.listDeploys(app.id());
+        } catch (CiToolException e) {
+            log.warn("Couldn't read the deploys of {}", app.id(), e);
+            return List.of();
+        }
     }
 
     /**

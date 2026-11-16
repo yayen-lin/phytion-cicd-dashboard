@@ -3,6 +3,7 @@ package com.phytion.dashboard.controller;
 import java.util.List;
 
 import com.phytion.dashboard.model.CodeBranch;
+import com.phytion.dashboard.model.CodeBranchCommits;
 import com.phytion.dashboard.model.CodeCommit;
 import com.phytion.dashboard.service.BitbucketCodeService;
 import lombok.RequiredArgsConstructor;
@@ -25,13 +26,14 @@ public class BitbucketCodeController {
     }
 
     @GetMapping("/api/code/commits")
-    public CommitsResponse listCommits(@RequestParam String appId, @RequestParam String branch) {
-        return new CommitsResponse(appId, branch, codeService.listCommits(appId, branch));
+    public CommitsResponse listCommits(@RequestParam String appId, @RequestParam(required = false) String branch) {
+        CodeBranchCommits result = codeService.listBranchCommits(appId, branch);
+        return new CommitsResponse(appId, result.branches(), result.branch(), result.commits());
     }
 
     public record BranchesResponse(String app, List<CodeBranch> branches) {
     }
 
-    public record CommitsResponse(String app, String branch, List<CodeCommit> commits) {
+    public record CommitsResponse(String app, List<CodeBranch> branches, String branch, List<CodeCommit> commits) {
     }
 }

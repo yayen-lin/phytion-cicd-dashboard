@@ -1,15 +1,10 @@
-import {useEffect, useState} from 'react'
 import {CircleCheck, CircleMinus, CircleX} from 'lucide-react'
-import {Alert, AlertDescription} from '@/components/ui/alert'
-import {Skeleton} from '@/components/ui/skeleton'
-import {getTestReport, type CiTestCase, type CiTestReport} from '@/api/ci'
+import type {CiTestCase, CiTestReport} from '@/api/ci'
 import {formatTestDuration} from '@/lib/format'
 import TestCounts from './TestCounts'
 
 type Props = {
-  /** e.g. "sample-app" */
-  appId: string
-  buildId: string
+  report: CiTestReport
 }
 
 // Failed first, then skipped, then passed
@@ -33,28 +28,8 @@ function groupByClass(cases: CiTestCase[]): [string, CiTestCase[]][] {
     .sort(([, a], [, b]) => worst(a) - worst(b))
 }
 
-/** Loads one build's test results and lists every test, grouped by class, failures first. */
-function TestResults({appId, buildId}: Props) {
-  // undefined while loading, null when the build has no test results
-  const [report, setReport] = useState<CiTestReport | null | undefined>(undefined)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    getTestReport(appId, buildId)
-      .then(setReport)
-      .catch(() => setError('Could not load the test results from the CI tool'))
-  }, [appId, buildId])
-
-  if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
-  if (report === undefined) {
-    return (
-      <div className="space-y-3 py-2">
-        {[0, 1, 2].map((i) => <Skeleton key={i} className="h-6 w-full"/>)}
-      </div>
-    )
-  }
-  if (report === null) return <p className="py-2 text-sm text-muted-foreground">No test results.</p>
-
+/** One build's test results: every test, grouped by class, failures first. */
+function TestResults({report}: Props) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -17,9 +18,14 @@ import com.phytion.dashboard.adapter.release.ReleaseToolException;
 import com.phytion.dashboard.config.AppsProperties;
 import com.phytion.dashboard.config.EnvironmentsProperties;
 import com.phytion.dashboard.model.AuditEntry;
+import com.phytion.dashboard.model.AuditFilter;
+import com.phytion.dashboard.model.CiBuild;
+import com.phytion.dashboard.model.CiBuildDetails;
+import com.phytion.dashboard.model.CiParameterizedBuild;
 import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.CodeRepo;
 import com.phytion.dashboard.model.DeployJob;
+import com.phytion.dashboard.model.DeployRun;
 import com.phytion.dashboard.model.ReleaseImage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,7 +58,57 @@ class JenkinsDeployServiceTests {
         audit = mock(AuditService.class);
         when(releases.hasVersion(APP, "1.0.1")).thenReturn(true);
         deployService = new JenkinsDeployService(jenkins, releases, audit, new AppService(APPS),
-                new EnvironmentsProperties(List.of("dev", "staging", "prod")));
+                new EnvironmentsProperties(List.of("dev", "staging", "prod"), List.of("prod")));
+    }
+
+    @Test
+    void listDeploysReadsTheDeployJobAndNamesTheDashboardUserOverTheCiToolsUser() {
+        CiBuild build9 = deployBuild("9");
+        CiBuild build8 = deployBuild("8");
+        CiBuild build7 = deployBuild("7");
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                // started from the dashboard, which calls Jenkins as its own user
+                new CiParameterizedBuild(build9, STAGING_1_0_1, "dashboard-bot"),
+                // started straight in Jenkins
+                new CiParameterizedBuild(build8, Map.of("VERSION", "1.0.0", "ENVIRONMENT", "dev"), "admin"),
+                // a run without the parameters says nothing about a deploy
+                new CiParameterizedBuild(build7, Map.of(), "admin")));
+        when(audit.getRecentEntries(new AuditFilter(APP, AuditEntry.ActionType.DEPLOY, null,
+                AuditEntry.ActionResult.SUCCESS, null, null, null))).thenReturn(List.of(
+                new AuditEntry("andy", AuditEntry.ActionType.DEPLOY, APP, Instant.now(),
+                        AuditEntry.ActionResult.SUCCESS, "9", "1.0.1 to staging", "staging", "1.0.1")));
+
+        assertThat(deployService.listDeploys(APP)).containsExactly(
+                new DeployRun(APP, "1.0.1", "staging", build9, "andy"),
+                new DeployRun(APP, "1.0.0", "dev", build8, "admin"));
+    }
+
+    @Test
+    void listDeploysOfAnAppThatIsNotDeployedIsRejected() {
+        assertThatThrownBy(() -> deployService.listDeploys("undeployed-app"))
+                .isInstanceOf(AppNotFoundException.class);
+        verifyNoInteractions(jenkins);
+    }
+
+    private static CiBuild deployBuild(String id) {
+        return new CiBuild(id, CiBuild.Status.SUCCESS, null, null, Instant.parse("2026-11-13T18:31:00Z"), 1000L,
+                "http://localhost:8081/job/sample-app-deploy-job/" + id + "/", null);
+    }
+
+    @Test
+    void getDeployBuildReadsTheBuildFromTheDeployJob() {
+        CiBuild build = new CiBuild("3", CiBuild.Status.RUNNING, null, null, Instant.parse("2026-11-13T18:31:00Z"),
+                null, "http://localhost:8081/job/sample-app-deploy-job/3/", null);
+        when(jenkins.getBuild(DEPLOY_JOB, "3")).thenReturn(Optional.of(new CiBuildDetails(build, "admin", "jenkins", null)));
+
+        assertThat(deployService.getDeployBuild(APP, "3")).contains(build);
+    }
+
+    @Test
+    void getDeployBuildOfAnAppThatIsNotDeployedIsRejected() {
+        assertThatThrownBy(() -> deployService.getDeployBuild("undeployed-app", "3"))
+                .isInstanceOf(AppNotFoundException.class);
+        verifyNoInteractions(jenkins);
     }
 
     @Test

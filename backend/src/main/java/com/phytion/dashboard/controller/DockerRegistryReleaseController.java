@@ -2,6 +2,10 @@ package com.phytion.dashboard.controller;
 
 import java.util.List;
 
+import com.phytion.dashboard.model.CodeBranch;
+import com.phytion.dashboard.model.CodeBranchCommits;
+import com.phytion.dashboard.model.CodeCommit;
+import com.phytion.dashboard.model.ReleaseDraft;
 import com.phytion.dashboard.model.ReleaseVersion;
 import com.phytion.dashboard.service.DockerRegistryReleaseService;
 import jakarta.validation.Valid;
@@ -32,6 +36,21 @@ public class DockerRegistryReleaseController {
     }
 
     /**
+     * What the Release dialog starts with.
+     */
+    @GetMapping("/api/release/draft")
+    public ReleaseDraftResponse draftRelease(@RequestParam String appId,
+                                             @RequestParam(required = false) String branch,
+                                             @RequestParam(defaultValue = "true") boolean withCommits) {
+        ReleaseDraft draft = releaseService.draftRelease(appId, branch, withCommits);
+        CodeBranchCommits commits = draft.commits();
+        return new ReleaseDraftResponse(appId, draft.nextVersion(),
+                commits == null ? null : commits.branches(),
+                commits == null ? null : commits.branch(),
+                commits == null ? null : commits.commits());
+    }
+
+    /**
      * Tags a commit as a new version and starts its build; the version shows up once the build has pushed it
      */
     @PostMapping("/api/release/versions")
@@ -41,6 +60,16 @@ public class DockerRegistryReleaseController {
     }
 
     public record VersionsResponse(String app, List<ReleaseVersion> versions) {
+    }
+
+    /**
+     * @param nextVersion the version to suggest
+     * @param branches    every branch, or null when withCommits was false
+     * @param branch      the branch the commits are from (null when not asked, or the repo has no branches)
+     * @param commits     that branch's recent commits, or null when withCommits was false
+     */
+    public record ReleaseDraftResponse(String app, String nextVersion, List<CodeBranch> branches, String branch,
+                                       List<CodeCommit> commits) {
     }
 
     /**

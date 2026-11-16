@@ -7,6 +7,7 @@ import java.util.Optional;
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiTestReport;
 import com.phytion.dashboard.model.CiBuild;
+import com.phytion.dashboard.model.CiParameterizedBuild;
 
 /**
  * jenkins ci implementation
@@ -15,6 +16,9 @@ public interface JenkinsAdapter {
 
     /** most recent builds of a job, newest first. */
     List<CiBuild> listBuilds(String job);
+
+    /** most recent builds of a job with their parameters and who started them in Jenkins, newest first. */
+    List<CiParameterizedBuild> listParameterizedBuilds(String job);
 
     /** One build of a job with who started it in Jenkins (null if no user did), or empty if it doesn't exist. */
     Optional<CiBuildDetails> getBuild(String job, String buildId);

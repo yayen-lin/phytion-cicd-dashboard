@@ -19,6 +19,7 @@ import java.util.Map;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.model.CiBuildDetails;
+import com.phytion.dashboard.model.CiParameterizedBuild;
 import com.phytion.dashboard.model.CiTestCase;
 import com.phytion.dashboard.model.CiTestCounts;
 import com.phytion.dashboard.model.CiTestReport;
@@ -92,6 +93,36 @@ class JenkinsAdapterImplTests {
                 .andRespond(withSuccess("{\"builds\": []}", MediaType.APPLICATION_JSON));
 
         assertThat(adapter.listBuilds("sample-app")).isEmpty();
+    }
+
+    @Test
+    void listParameterizedBuildsReadsEachBuildsParametersAndWhoStartedIt() {
+        jenkins.expect(requestTo(startsWith("http://jenkins/job/sample-app-deploy/api/json")))
+                .andRespond(withSuccess("""
+                        {"builds": [
+                          {"number": 4, "result": "FAILURE", "inProgress": false, "timestamp": 1793745018832,
+                           "duration": 90000, "url": "http://jenkins/job/sample-app-deploy/4/", "actions": [
+                             {"_class": "hudson.model.ParametersAction", "parameters": [
+                               {"_class": "hudson.model.StringParameterValue", "name": "VERSION", "value": "1.0.1"},
+                               {"_class": "hudson.model.ChoiceParameterValue", "name": "ENVIRONMENT", "value": "prod"},
+                               {"_class": "hudson.model.BooleanParameterValue", "name": "DRY_RUN", "value": false}]},
+                             {"_class": "hudson.model.CauseAction", "causes": [
+                               {"_class": "hudson.model.Cause$UserIdCause", "userId": "andy", "userName": "Andy Lin"}]},
+                             {}]},
+                          {"number": 3, "result": "SUCCESS", "inProgress": false, "timestamp": 1793744856847,
+                           "duration": 1000, "url": "http://jenkins/job/sample-app-deploy/3/", "actions": []}
+                        ]}
+                        """, MediaType.APPLICATION_JSON));
+
+        List<CiParameterizedBuild> builds = adapter.listParameterizedBuilds("sample-app-deploy");
+
+        assertThat(builds).hasSize(2);
+        assertThat(builds.getFirst().build().status()).isEqualTo(CiBuild.Status.FAILED);
+        assertThat(builds.getFirst().parameters())
+                .isEqualTo(Map.of("VERSION", "1.0.1", "ENVIRONMENT", "prod", "DRY_RUN", "false"));
+        assertThat(builds.getFirst().startedBy()).isEqualTo("Andy Lin");
+        assertThat(builds.get(1).parameters()).isEmpty();
+        assertThat(builds.get(1).startedBy()).isNull();
     }
 
     @Test

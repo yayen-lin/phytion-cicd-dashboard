@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.model.CodeBranchCommits;
+import com.phytion.dashboard.model.ReleaseDraft;
 import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.adapter.release.dockerregistry.DockerRegistryAdapter;
 import com.phytion.dashboard.adapter.release.dockerregistry.DockerRegistryProperties;
@@ -199,6 +201,24 @@ class DockerRegistryReleaseServiceTests {
     }
 
     @Test
+    void findLatestVersionReadsTheLabelsOfTheHighestVersionOnly() {
+        when(release.listTags(IMAGE)).thenReturn(List.of("1.9.0", "1.10.0", "1.2.0"));
+        when(release.getLabels(IMAGE, "1.10.0")).thenReturn(Map.of("com.phytionassetmanagement.build-number", "12"));
+
+        assertThat(releaseService.findLatestVersion(APP)).get()
+                .extracting(ReleaseVersion::version, ReleaseVersion::buildId)
+                .containsExactly("1.10.0", "12");
+        verify(release, never()).getLabels(IMAGE, "1.9.0");
+    }
+
+    @Test
+    void findLatestVersionOfAnAppWithNoVersionsIsEmpty() {
+        when(release.listTags(IMAGE)).thenReturn(List.of());
+
+        assertThat(releaseService.findLatestVersion(APP)).isEmpty();
+    }
+
+    @Test
     void listVersionsOnlyReadsTheLabelsOfTheNewestMaxVersions() {
         releaseService = service(APPS, 2);
         when(release.listTags(IMAGE)).thenReturn(List.of("0.1.0", "0.3.0", "0.2.0"));
@@ -239,5 +259,35 @@ class DockerRegistryReleaseServiceTests {
     private DockerRegistryReleaseService service(AppsProperties apps, int maxVersions) {
         return new DockerRegistryReleaseService(release, code, ci, audit, new AppService(apps),
                 new DockerRegistryProperties("http://registry", maxVersions));
+    }
+
+    @Test
+    void nextVersionBumpsTheHighestReleaseTagsLastNumber() {
+        // compared as numbers, not text: 1.0.10 is higher than 1.0.9; other tags are ignored
+        assertThat(DockerRegistryReleaseService.nextVersion(List.of("v1.0.9", "v1.0.10", "v0.9.0", "latest")))
+                .isEqualTo("v1.0.11");
+    }
+
+    @Test
+    void nextVersionOfAnAppNeverReleasedIsTheFirst() {
+        assertThat(DockerRegistryReleaseService.nextVersion(List.of())).isEqualTo("v0.0.1");
+        assertThat(DockerRegistryReleaseService.nextVersion(List.of("nightly"))).isEqualTo("v0.0.1");
+    }
+
+    @Test
+    void draftReleaseHasTheNextVersionAndTheBranchesWithCommits() {
+        CodeBranchCommits commits = new CodeBranchCommits(List.of(), "main", List.of());
+        when(code.listTags(APP)).thenReturn(List.of("v1.0.2", "v1.0.1"));
+        when(code.listBranchCommits(APP, null)).thenReturn(commits);
+
+        assertThat(releaseService.draftRelease(APP, null, true)).isEqualTo(new ReleaseDraft("v1.0.3", commits));
+    }
+
+    @Test
+    void draftReleaseWithThePickedCommitReadsOnlyTheTags() {
+        when(code.listTags(APP)).thenReturn(List.of("v1.0.2"));
+
+        assertThat(releaseService.draftRelease(APP, null, false)).isEqualTo(new ReleaseDraft("v1.0.3", null));
+        verify(code, never()).listBranchCommits(anyString(), eq(null));
     }
 }

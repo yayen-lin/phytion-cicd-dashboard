@@ -153,20 +153,28 @@ Decisions:
 - Apps run locally on Docker Desktop's built-in Kubernetes, one namespace per environment
   (`dev`, `staging`, `prod`)
 - Images go to a local registry container for now (AWS ECR later)
-- A release is a git tag `vX.Y.Z` (e.g. `v1.4.0`) on a commit on main, made with the dashboard's
-  "Release" button through Bitbucket's API. Only builds of a tag push an image; builds of main
-  run Build and Test only
+- A release is a git tag `vX.Y.Z` (e.g. `v1.4.0`) on a commit on any branch, made with the
+  dashboard's "Release" button through Bitbucket's API. Only builds of a tag push an image;
+  builds of a branch run Build and Test only
 - Image tag = the git tag without the `v`, e.g. `sample-app:1.4.0`. The image's labels hold the
   commit, the Jenkins build number and the release time, so every version points to one build and
   one commit (the base for tracing credits back to code). The image's own "created" date isn't
   used: Docker keeps an earlier build's date when the app's files didn't change
-- Any commit on main can be released: the tag build runs Build and Test again, so a failing commit
-  gets no image. A version whose tag build failed is skipped; release the next one (e.g. `v1.4.1`)
+- Any commit on any branch can be released (not only main, to stay flexible): the tag build runs
+  Build and Test again, so a failing commit gets no image. A version whose tag build failed is
+  skipped; release the next one (e.g. `v1.4.1`)
 - No webhooks yet, so Jenkins doesn't see new tags by itself: the dashboard creates the tag, then
   starts a build of that tag (the Jenkins job takes a parameter: the branch or tag to build)
 - Jenkins deploys (a deploy job with app, version and environment as parameters); the dashboard
   triggers it and records it in the audit log. Kubernetes is only read, to see what runs where
 - Jenkins gets Docker by mounting Docker Desktop's socket and adding the Docker CLI to its image
+- One request per view or table: the backend combines what a view shows (from every tool it
+  needs) into one endpoint, and the frontend makes one call for it. A tool that can't be reached
+  leaves its part empty and marked unavailable instead of failing the whole response
+- The tools are the record of what happened: builds, releases and deploys are read from the
+  tools (Jenkins, the registry, Kubernetes), so ones started outside the dashboard (e.g. straight
+  in Jenkins) show too. The audit log only adds which dashboard user did it (the tools only see
+  the dashboard's own user), and keeps attempts that never reached a tool
 
 - [x] 2.0 Test page (sidebar "Test"): the test results Jenkins already collects (the `Test` stage
       in each `Jenkinsfile` publishes JUnit results). Per pipeline: recent builds with passed /
@@ -210,7 +218,7 @@ Decisions:
            `deploy.job`) and the environments list; a deploy service that checks the version is
            in the registry and the environment exists, triggers the job with the Jenkins adapter,
            and records `DEPLOY` (also when it fails, with the reason); a POST endpoint; tests
-  - [ ] 5. Environment-first layout, before any new frontend: pages per environment and per app
+  - [x] 5. Environment-first layout, before any new frontend: pages per environment and per app
            instead of per stage, reusing today's tables and dialogs. Sidebar: Overview, `dev`,
            `staging`, `prod`, Apps, History
     - Overview: one card per environment (how many apps, how many healthy, latest deploy)
@@ -225,12 +233,63 @@ Decisions:
       Clicking a commit row tags it, which is the release: the same dialog as the Release action
     - Tagging a commit is releasing (`v1.0.2` makes Jenkins build image `1.0.2`); deploying is
       picking which version (tag) goes into an environment
-  - [ ] 6. Frontend: one Deploy dialog (pick a version from the registry, and the environment when
-           opened from the Apps page), opened from the Apps page's Deploy action and the environment
-           page's "Deploy a version"; then shows the started deploy build with a link to Jenkins
-  - [ ] 7. Check end to end: deploy from the dashboard, see the pods in `kubectl get pods -n <env>`
+    - Old stage pages are removed in the item that replaces them, not at the end
+    - [x] 5.1 Routes and sidebar: routes `/`, `/environments/:env`, `/apps`, `/apps/:app/:tab`,
+          `/history` with empty pages; sidebar Overview, the environments (from `GET /api/environments`,
+          read from the config only), Apps, History. Home page removed: `/` is the Overview
+    - [x] 5.2 App page: tabs Branches, Commits (any branch), Builds (with tests), Versions,
+          Environments, reusing today's tables
+    - [x] 5.3 Release from a commit: clicking a commit row (on any branch) opens the Release dialog;
+          the dialog warns when the commit isn't on main. Then remove the
+          Code, Build & Test and Release pages
+    - [x] 5.4 Apps page and Deploy dialog
+      - Backend: `GET /api/apps/summary`, one row per app (latest build with its test counts,
+        latest version, version and health in each environment). A tool that can't be reached
+        leaves its part empty and marked unavailable instead of failing the whole response
+      - Backend: `GET /api/deploy/deployments/{buildId}?appId=`, a deploy build's status and
+        Jenkins link (deploys run in the app's deploy job, which the build endpoints don't read)
+      - Apps page: one row per app from the summary; actions Run build, Release, Deploy; clicking
+        a row opens the app page
+      - Deploy dialog: pick a version from the registry and an environment; then shows the started
+        deploy build with a link to Jenkins. Environments in `dashboard.confirm-environments`
+        (`prod`) ask to type the environment's name before deploying
+    - [x] 5.5 Environment page: one row per app (version, health, deployed when and by whom);
+          actions Deploy (the same dialog, environment already picked), Promote and Rollback
+          (shown as "soon" until 2.5 and 2.6); clicking a row opens the app page
+    - [x] 5.6 Overview (`GET /api/overview`): one fixed-height card per environment (any number of them) with its status from Kubernetes (Healthy, Failing, Nothing running), deploys still running, and a scrollable list of the apps running there (failing first; version, who deployed it and when). Deploys are read from each app's Jenkins deploy job, so ones started in Jenkins show too; a failed deploy that left the old version running isn't shown as failing
+    - [x] 5.7 One request per view: each view below combines several requests today; give each one
+          backend endpoint that returns all it shows (selectors included)
+      - [x] 1. History page: the audit log with each entry's build in one response
+               (`GET /api/history`); a deploy's build is looked up in the deploy job (it was wrongly
+               looked up in the pipeline) and links to Jenkins
+      - [x] 2. Build details dialog: the build and its test report in one response
+               (`GET /api/ci/builds/{id}`, both read from Jenkins at the same time; the `/tests`
+               endpoint is gone)
+      - [x] 3. Commits table: the branches and the chosen branch's commits (default main) in one
+               response (`GET /api/code/commits?appId=&branch=`, branch optional; the backend picks
+               the branch and reads its commits while reading the branches); switching branches is
+               one request
+      - [x] 4. Release dialog: the same endpoint as the Commits table for its branch and commit
+               pickers
+      - [x] 5. App page header: `GET /api/apps/{id}` instead of loading every app to find one
+    - [x] 5.8 Final check: no unused pages, components or API functions left; every route and
+          sidebar link works
+      - [x] Code check: no unused frontend pages, components, API functions or helpers; every link
+            points at a route; no unused backend service or adapter methods. `GET /api/apps` and
+            `GET /api/audit` are no longer called by the frontend: marked UNUSED, kept for review
+      - [x] In the browser: open every route and sidebar link with the backend running
+  - [x] 6. Folded into 5.4 (Deploy dialog)
+  - [x] 7. Check end to end: deploy from the dashboard, see the pods in `kubectl get pods -n <env>`
            and the `DEPLOY` entry on the History page
-- [ ] 2.4 Environment overview (Deploy page): read-only Kubernetes adapter; a grid of apps x
+  - [x] 8. Small changes:
+      - Release dialog fills in the version: the repo's highest `vX.Y.Z` tag with the last number
+        bumped (`v0.0.1` for the first release), from `GET /api/release/draft`, which also returns
+        the branches and commits (one request)
+      - Toasts at the top right
+      - Sidebar: Overview, Apps; Environments; Management (History, Users disabled until the Users
+        page exists)
+      - Ready / desired pods shown on the Overview rows and the Apps page's environment cells
+- [x] 2.4 Environment overview (Deploy page): read-only Kubernetes adapter; a grid of apps x
       environments showing the running version, its commit, whether it's healthy (ready pods),
       and when and by whom it was deployed (from the audit log)
 - [ ] 2.5 Promotion: "Promote" moves the exact version running in dev to staging, or staging to

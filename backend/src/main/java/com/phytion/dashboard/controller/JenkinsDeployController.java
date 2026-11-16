@@ -1,12 +1,17 @@
 package com.phytion.dashboard.controller;
 
+import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.service.JenkinsDeployService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -26,6 +31,14 @@ public class JenkinsDeployController {
         return new DeployResponse(request.appId(), request.version(), request.environment(),
                 deployService.deploy(request.appId(), request.version(), request.environment(),
                         authentication.getName()).orElse(null));
+    }
+
+    /**
+     * One build of the app's deploy job
+     */
+    @GetMapping("/api/deploy/deployments/{buildId}")
+    public ResponseEntity<CiBuild> getDeployBuild(@RequestParam String appId, @PathVariable String buildId) {
+        return ResponseEntity.of(deployService.getDeployBuild(appId, buildId));
     }
 
     /**

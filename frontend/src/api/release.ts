@@ -1,4 +1,5 @@
 import {checkLogin, errorMessage, postJson} from './client'
+import type {CodeBranch, CodeCommit} from './code'
 
 /**
  * One released version of an app: an image in the release tool. Everything but the version comes from the image's
@@ -16,6 +17,26 @@ export type ReleaseVersion = {
 export async function getVersions(appId: string): Promise<{ app: string, versions: ReleaseVersion[] }> {
   const res = await checkLogin(fetch(`/api/release/versions?${new URLSearchParams({appId})}`))
   if (!res.ok) throw new Error(`GET /api/release/versions failed: ${res.status}`)
+  return res.json()
+}
+
+/** What the Release dialog starts with */
+export type ReleaseDraft = {
+  app: string
+  nextVersion: string // the highest vX.Y.Z tag with the last number bumped, e.g. "v1.0.3"; "v0.0.1" for the first
+  branches: CodeBranch[] | null // null when asked without commits
+  branch: string | null // the branch the commits are from
+  commits: CodeCommit[] | null // null when asked without commits
+}
+
+/**
+ * Returns the next version and, when withCommits, the branches with one branch's commits (main when branch is null).
+ * e.g. ("sample-app", null, true) -> {nextVersion: "v1.0.3", branches: [...], branch: "main", commits: [...]}
+ */
+export async function getReleaseDraft(appId: string, branch: string | null, withCommits: boolean): Promise<ReleaseDraft> {
+  const params = new URLSearchParams({appId, withCommits: String(withCommits), ...(branch ? {branch} : {})})
+  const res = await checkLogin(fetch(`/api/release/draft?${params}`))
+  if (!res.ok) throw new Error(`GET /api/release/draft failed: ${res.status}`)
   return res.json()
 }
 

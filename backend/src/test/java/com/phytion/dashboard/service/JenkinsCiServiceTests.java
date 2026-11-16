@@ -16,8 +16,10 @@ import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.config.AppsProperties;
 import com.phytion.dashboard.model.AuditEntry;
-import com.phytion.dashboard.model.AuditFilter;
 import com.phytion.dashboard.model.CiBuildDetails;
+import com.phytion.dashboard.model.CiTestCase;
+import com.phytion.dashboard.model.CiTestCounts;
+import com.phytion.dashboard.model.CiTestReport;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.CodeRepo;
@@ -54,10 +56,8 @@ class JenkinsCiServiceTests {
 
     @Test
     void getBuildStartedThroughTheDashboardShowsTheDashboardUser() {
-        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "dashboard-bot", null)));
-        when(audit.getRecentEntries(new AuditFilter("sample-app", AuditEntry.ActionType.BUILD, null, null, "4", null, null)))
-                .thenReturn(List.of(new AuditEntry("andy", AuditEntry.ActionType.BUILD, "sample-app", Instant.now(),
-                        AuditEntry.ActionResult.SUCCESS, "4", null, null, null)));
+        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "dashboard-bot", null, null)));
+        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.of("andy"));
 
         assertThat(ciService.getBuild("sample-app", "4")).get()
                 .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
@@ -66,8 +66,8 @@ class JenkinsCiServiceTests {
 
     @Test
     void getBuildStartedOutsideTheDashboardShowsTheCiToolUser() {
-        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "Andy Lin", null)));
-        when(audit.getRecentEntries(new AuditFilter("sample-app", AuditEntry.ActionType.BUILD, null, null, "4", null, null))).thenReturn(List.of());
+        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), "Andy Lin", null, null)));
+        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.empty());
 
         assertThat(ciService.getBuild("sample-app", "4")).get()
                 .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
@@ -76,12 +76,33 @@ class JenkinsCiServiceTests {
 
     @Test
     void getBuildStartedByNoOneHasNoSource() {
-        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), null, null)));
-        when(audit.getRecentEntries(new AuditFilter("sample-app", AuditEntry.ActionType.BUILD, null, null, "4", null, null))).thenReturn(List.of());
+        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), null, null, null)));
+        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.empty());
 
         assertThat(ciService.getBuild("sample-app", "4")).get()
                 .extracting(CiBuildDetails::startedBy, CiBuildDetails::startedBySource)
                 .containsExactly(null, null);
+    }
+
+    @Test
+    void getBuildHasItsTestReport() {
+        CiTestReport report = new CiTestReport(new CiTestCounts(1, 0, 0), 14L, List.of(new CiTestCase(
+                "com.phytion.sampleapp.HelloControllerTests", "helloReturnsMessage()", CiTestCase.Status.PASSED, 14L,
+                null)));
+        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), null, null, null)));
+        when(ci.getTestReport("sample-app-job", "4")).thenReturn(Optional.of(report));
+        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.empty());
+
+        assertThat(ciService.getBuild("sample-app", "4")).get().extracting(CiBuildDetails::testReport).isEqualTo(report);
+    }
+
+    @Test
+    void getBuildWithoutTestsHasNoTestReport() {
+        when(ci.getBuild("sample-app-job", "4")).thenReturn(Optional.of(new CiBuildDetails(build("4"), null, null, null)));
+        when(ci.getTestReport("sample-app-job", "4")).thenReturn(Optional.empty());
+        when(audit.findBuildStarter("sample-app", "4")).thenReturn(Optional.empty());
+
+        assertThat(ciService.getBuild("sample-app", "4")).get().extracting(CiBuildDetails::testReport).isNull();
     }
 
     @Test

@@ -45,11 +45,12 @@ class KubernetesEnvironmentControllerTests {
         when(environmentService.listEnvironments("staging", null)).thenReturn(List.of(new EnvironmentStatus("staging",
                 List.of(new EnvironmentApp("sample-app", "1.0.1", "a4dad00", null, 1, 1, true,
                                 Instant.parse("2026-11-13T18:31:00Z"), "andy", "3"),
-                        EnvironmentApp.notDeployed("dummy-app")))));
+                        EnvironmentApp.notDeployed("dummy-app")), List.of())));
 
         mvc.perform(get("/api/deploy/environments").param("environment", "staging"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.environments[0].environment").value("staging"))
+                .andExpect(jsonPath("$.environments[0].needsConfirmation").value(false))
                 .andExpect(jsonPath("$.environments[0].apps[0].version").value("1.0.1"))
                 .andExpect(jsonPath("$.environments[0].apps[0].healthy").value(true))
                 .andExpect(jsonPath("$.environments[0].apps[0].deployedBy").value("andy"))
@@ -67,6 +68,17 @@ class KubernetesEnvironmentControllerTests {
         mvc.perform(get("/api/deploy/environments").param("environment", "test"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Environments are dev, staging, prod, got: test"));
+    }
+
+    @Test
+    @WithMockUser
+    void prodNeedsConfirmation() throws Exception {
+        when(environmentService.listEnvironments("prod", null))
+                .thenReturn(List.of(new EnvironmentStatus("prod", List.of(EnvironmentApp.notDeployed("sample-app")), List.of())));
+
+        mvc.perform(get("/api/deploy/environments").param("environment", "prod"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.environments[0].needsConfirmation").value(true));
     }
 
     @Test

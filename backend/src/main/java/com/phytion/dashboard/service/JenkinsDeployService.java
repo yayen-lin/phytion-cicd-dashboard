@@ -1,7 +1,9 @@
 package com.phytion.dashboard.service;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
@@ -9,6 +11,11 @@ import com.phytion.dashboard.adapter.release.ReleaseToolException;
 import com.phytion.dashboard.config.EnvironmentsProperties;
 import com.phytion.dashboard.model.App;
 import com.phytion.dashboard.model.AuditEntry;
+import com.phytion.dashboard.model.AuditFilter;
+import com.phytion.dashboard.model.CiBuild;
+import com.phytion.dashboard.model.CiBuildDetails;
+import com.phytion.dashboard.model.CiParameterizedBuild;
+import com.phytion.dashboard.model.DeployRun;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,7 +37,53 @@ public class JenkinsDeployService {
     private static final String ENVIRONMENT = "ENVIRONMENT";
 
     /**
-     * Starts the deploy job for a released version and records it
+     * The app's recent deploys.
+     *
+     * @param appId the name of the app
+     * @return the deploys, newest first; at most the CI tool's max-builds
+     * @throws AppNotFoundException when no configured app has that id, or the app isn't deployed
+     * @throws CiToolException      when the CI tool can't be reached
+     */
+    public List<DeployRun> listDeploys(String appId) {
+        App app = apps.getApp(appId);
+        if (app.deploy() == null) {
+            throw AppNotFoundException.noDeploy(appId);
+        }
+        List<CiParameterizedBuild> builds = jenkins.listParameterizedBuilds(app.deploy().job());
+
+        // who started each build from the dashboard: the CI tool only knows the dashboard's own user
+        Map<String, String> dashboardUsers = audit.getRecentEntries(new AuditFilter(appId, AuditEntry.ActionType.DEPLOY,
+                        null, AuditEntry.ActionResult.SUCCESS, null, null, null)).stream()
+                .filter(entry -> entry.getBuildId() != null)
+                .collect(Collectors.toMap(AuditEntry::getBuildId, AuditEntry::getUsername, (newest, older) -> newest));
+
+        // keep the builds that say what they deployed where
+        return builds.stream()
+                .filter(run -> run.parameters().containsKey(VERSION) && run.parameters().containsKey(ENVIRONMENT))
+                .map(run -> new DeployRun(appId, run.parameters().get(VERSION), run.parameters().get(ENVIRONMENT),
+                        run.build(), dashboardUsers.getOrDefault(run.build().id(), run.startedBy())))
+                .toList();
+    }
+
+    /**
+     * Get one build of an app's deploy job.
+     *
+     * @param appId   the name of the app
+     * @param buildId the build's id in the deploy job
+     * @return the build, or empty when the deploy job has no such build
+     * @throws AppNotFoundException when no configured app has that id, or the app isn't deployed
+     * @throws CiToolException      when the CI tool can't be reached
+     */
+    public Optional<CiBuild> getDeployBuild(String appId, String buildId) {
+        App app = apps.getApp(appId);
+        if (app.deploy() == null) {
+            throw AppNotFoundException.noDeploy(appId);
+        }
+        return jenkins.getBuild(app.deploy().job(), buildId).map(CiBuildDetails::build);
+    }
+
+    /**
+     * Starts the deploy job for a released version and records it.
      *
      * @param appId       the name of the app
      * @param version     a version in the registry

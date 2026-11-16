@@ -1,24 +1,23 @@
 import { Navigate, Route, Routes } from 'react-router'
 import AppLayout from '@/layout/AppLayout'
-import BuildPage from '@/features/build/BuildPage'
-import CodePage from '@/features/code/CodePage'
+import AppPage from '@/features/apps/AppPage'
+import AppsPage from '@/features/apps/AppsPage'
+import EnvironmentPage from '@/features/environments/EnvironmentPage'
 import HistoryPage from '@/features/history/HistoryPage'
-import HomePage from '@/features/home/HomePage'
-import ReleasePage from '@/features/release/ReleasePage'
+import OverviewPage from '@/features/overview/OverviewPage'
 
 function App() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
-        {/* Landing page after login */}
-        <Route index element={<HomePage />} />
-        <Route path="code" element={<Navigate to="/code/branches" replace />} />
-        <Route path="code/:tab" element={<CodePage />} />
-        <Route path="build" element={<Navigate to="/build/builds" replace />} />
-        {/* Each tab loads its own data each time it is opened */}
-        <Route path="build/:tab" element={<BuildPage />} />
-        <Route path="release" element={<ReleasePage />} />
+        {/* landing page after login */}
+        <Route index element={<OverviewPage />} />
+        <Route path="environments/:environment" element={<EnvironmentPage />} />
+        <Route path="apps" element={<AppsPage />} />
+        <Route path="apps/:appId" element={<Navigate to="commits" replace />} />
+        <Route path="apps/:appId/:tab" element={<AppPage />} />
         <Route path="history" element={<HistoryPage />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

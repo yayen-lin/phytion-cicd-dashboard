@@ -23,13 +23,22 @@ export async function getBranches(appId: string): Promise<{ app: string, branche
   return res.json()
 }
 
-/** Returns the most recent commits on a branch of an app's repo, newest first. */
-export async function getCommits(appId: string, branch: string): Promise<{
-  app: string,
-  branch: string,
-  commits: CodeCommit[]
-}> {
-  const res = await checkLogin(fetch(`/api/code/commits?${new URLSearchParams({ appId, branch })}`))
+/** A repo's branches, with the commits on one of them */
+export type BranchCommits = {
+  app: string
+  branches: CodeBranch[] // the most recently committed to first
+  branch: string | null // the branch the commits are from; null when the repo has no branches
+  commits: CodeCommit[] // newest first
+}
+
+/**
+ * Returns the branches of an app's repo with the most recent commits on one of them: the asked branch, else main, else
+ * master, else the most recently committed to.
+ * e.g. ("sample-app", null) -> {branches: [main, dev], branch: "main", commits: [...]}; ("sample-app", "gone") -> main's
+ */
+export async function getCommits(appId: string, branch: string | null): Promise<BranchCommits> {
+  const params = new URLSearchParams({appId, ...(branch ? {branch} : {})})
+  const res = await checkLogin(fetch(`/api/code/commits?${params}`))
   if (!res.ok) throw new Error(`GET /api/code/commits failed: ${res.status}`)
   return res.json()
 }

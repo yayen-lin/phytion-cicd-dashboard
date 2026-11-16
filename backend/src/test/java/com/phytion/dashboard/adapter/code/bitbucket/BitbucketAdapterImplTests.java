@@ -89,6 +89,17 @@ class BitbucketAdapterImplTests {
     }
 
     @Test
+    void listTagsReturnsTheTagNamesNewestFirst() {
+        bitbucket.expect(requestTo(
+                        "http://bitbucket/repositories/andy-test-app/sample-app/refs/tags?sort=-target.date&pagelen=100"))
+                .andRespond(withSuccess("""
+                        {"values": [{"name": "v1.0.2", "type": "tag"}, {"name": "v1.0.1", "type": "tag"}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(adapter.listTags("andy-test-app", "sample-app")).containsExactly("v1.0.2", "v1.0.1");
+    }
+
+    @Test
     void emptyRepoHasNoBranches() {
         bitbucket.expect(requestTo(
                         "http://bitbucket/repositories/andy-test-app/sample-app/refs/branches?sort=-target.date&pagelen=50"))

@@ -2,13 +2,16 @@ package com.phytion.dashboard.controller;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.service.AppNotFoundException;
 import com.phytion.dashboard.service.InvalidDeployException;
 import com.phytion.dashboard.service.JenkinsDeployService;
@@ -39,6 +42,27 @@ class JenkinsDeployControllerTests {
 
     @MockitoBean
     private JenkinsDeployService deployService;
+
+    @Test
+    @WithMockUser
+    void getDeployBuildReturnsItsStatusAndLink() throws Exception {
+        when(deployService.getDeployBuild(APP, "3")).thenReturn(Optional.of(new CiBuild("3", CiBuild.Status.RUNNING,
+                null, null, Instant.parse("2026-11-13T18:31:00Z"), null,
+                "http://localhost:8081/job/sample-app-deploy/3/", null)));
+
+        mvc.perform(get("/api/deploy/deployments/3").param("appId", APP))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RUNNING"))
+                .andExpect(jsonPath("$.url").value("http://localhost:8081/job/sample-app-deploy/3/"));
+    }
+
+    @Test
+    @WithMockUser
+    void getDeployBuildThatDoesNotExistGives404() throws Exception {
+        when(deployService.getDeployBuild(APP, "99")).thenReturn(Optional.empty());
+
+        mvc.perform(get("/api/deploy/deployments/99").param("appId", APP)).andExpect(status().isNotFound());
+    }
 
     @Test
     void deployNeedsLogin() throws Exception {

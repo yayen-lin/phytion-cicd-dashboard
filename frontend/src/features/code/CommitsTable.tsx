@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from 'react'
+import {useCallback, useEffect, useState, type KeyboardEvent} from 'react'
 import {RefreshCw} from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
@@ -6,7 +6,7 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Skeleton} from '@/components/ui/skeleton'
-import {getBranches, getCommits, type CodeBranch, type CodeCommit} from '@/api/code'
+import {getCommits, type BranchCommits, type CodeCommit} from '@/api/code'
 import CommitLink from './CommitLink'
 import {firstLine} from '@/lib/format'
 
@@ -16,47 +16,26 @@ type Props = {
   /** The branch in the address, or null when there is none */
   branch: string | null
   onBranchChange: (branch: string) => void
+  /** When set, clicking a row calls it with that commit and the branch it's on; e.g. to release it */
+  onCommitClick?: (commit: CodeCommit, branch: string) => void
 }
 
-/** The branch in the address if the repo has it, else main, else master, else the most recently committed to. */
-function pickBranch(branches: CodeBranch[], wanted: string | null): string | null {
-  const names = branches.map((b) => b.name)
-  return [wanted, 'main', 'master'].find((name) => name && names.includes(name)) ?? names[0] ?? null
-}
-
-/** The most recent commits on one branch of an app's repo, newest first, with a branch selector. */
-function CommitsTable({appId, branch, onBranchChange}: Props) {
-  // null while loading
-  const [branches, setBranches] = useState<CodeBranch[] | null>(null)
-  // Which branch the commits are from, so switching branches shows the skeleton instead of the old branch's commits
-  const [commits, setCommits] = useState<{ branch: string, commits: CodeCommit[] } | null>(null)
+/** The most recent commits on one branch of an app's repo, newest first, with a branch selector; one request per branch. */
+function CommitsTable({appId, branch, onBranchChange, onCommitClick}: Props) {
+  // which branch was asked for, so switching branches shows the skeleton instead of the old branch's commits
+  const [loaded, setLoaded] = useState<{ asked: string | null, result: BranchCommits } | null>(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
 
-  const selected = branches ? pickBranch(branches, branch) : null
-
-  const loadBranches = useCallback(() => {
-    return getBranches(appId)
-      .then((data) => {
-        setBranches(data.branches)
-        setError('')
-      })
-      .catch(() => setError('Could not load branches from the code tool'))
-  }, [appId])
-
+  // the branches with the asked branch's commits (main when none is asked or it's gone)
   const loadCommits = useCallback(() => {
-    if (!selected) return Promise.resolve()
-    return getCommits(appId, selected)
-      .then((data) => {
-        setCommits({branch: selected, commits: data.commits})
+    return getCommits(appId, branch)
+      .then((result) => {
+        setLoaded({asked: branch, result})
         setError('')
       })
-      .catch(() => setError('Could not load commits from the code tool'))
-  }, [appId, selected])
-
-  useEffect(() => {
-    loadBranches()
-  }, [loadBranches])
+      .catch(() => setError('Could not load the commits from the code tool'))
+  }, [appId, branch])
 
   useEffect(() => {
     loadCommits()
@@ -65,17 +44,23 @@ function CommitsTable({appId, branch, onBranchChange}: Props) {
   // Keeps the current rows on screen while reloading
   async function handleRefresh() {
     setRefreshing(true)
-    await Promise.all([loadBranches(), loadCommits()])
+    await loadCommits()
     setRefreshing(false)
   }
 
-  const shown = commits && commits.branch === selected ? commits.commits : null
+  // the branch list stays while another branch loads; the rows only show for the asked branch
+  const current = loaded && loaded.asked === branch ? loaded.result : null
+  const branches = loaded?.result.branches ?? null
+  const selected = current ? current.branch : branch
+  const shown = current?.commits ?? null
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Commits</CardTitle>
-        <CardDescription>Recent commits on a branch, newest first</CardDescription>
+        <CardDescription>
+          Recent commits on a branch, newest first{onCommitClick && '. Click a commit to release it'}
+        </CardDescription>
         <CardAction className="flex gap-2">
           {branches && selected && (
             <Select value={selected} onValueChange={onBranchChange}>
@@ -99,7 +84,7 @@ function CommitsTable({appId, branch, onBranchChange}: Props) {
             <AlertTitle>Commits unavailable</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
-        ) : branches && !selected ? (
+        ) : current && !current.branch ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No branches yet.</p>
         ) : !shown ? (
           <div className="space-y-2">
@@ -119,8 +104,23 @@ function CommitsTable({appId, branch, onBranchChange}: Props) {
             </TableHeader>
             <TableBody>
               {shown.map((commit) => (
-                <TableRow key={commit.hash}>
-                  <TableCell><CommitLink commit={commit}/></TableCell>
+                <TableRow
+                  key={commit.hash}
+                  {...(onCommitClick && selected && {
+                    className: 'cursor-pointer',
+                    tabIndex: 0,
+                    'aria-label': `Release commit ${commit.hash.slice(0, 7)}`,
+                    onClick: () => onCommitClick(commit, selected),
+                    onKeyDown: (e: KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        onCommitClick(commit, selected)
+                      }
+                    },
+                  })}
+                >
+                  {/* the link opens the code tool, not the row's action */}
+                  <TableCell onClick={(e) => e.stopPropagation()}><CommitLink commit={commit}/></TableCell>
                   <TableCell className="max-w-md truncate" title={commit.message}>{firstLine(commit.message)}</TableCell>
                   <TableCell>{commit.author ?? '-'}</TableCell>
                   <TableCell className="text-muted-foreground">{new Date(commit.committedAt).toLocaleString()}</TableCell>

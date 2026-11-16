@@ -1,5 +1,4 @@
 import {useCallback, useEffect, useState} from 'react'
-import {toast} from 'sonner'
 import {RefreshCw, Tag} from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
@@ -10,25 +9,25 @@ import type {App} from '@/api/apps'
 import {getVersions, type ReleaseVersion} from '@/api/release'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import CommitLink from '@/features/code/CommitLink'
-import ReleaseDialog from './ReleaseDialog'
 
 type Props = {
   /** An app that is released */
   app: App
+  /** Opens the Release dialog */
+  onReleaseClick: () => void
 }
 
 /**
  * The released versions of an app, highest first. A version's build number opens that build's details, and its commit
  * links to the code tool.
  */
-function VersionsTable({app}: Props) {
+function VersionsTable({app, onReleaseClick}: Props) {
   // null while loading
   const [versions, setVersions] = useState<ReleaseVersion[] | null>(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   // The id of the build shown in the details modal, or null when it is closed
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [releaseOpen, setReleaseOpen] = useState(false)
 
   const loadVersions = useCallback(() => {
     return getVersions(app.id)
@@ -50,17 +49,6 @@ function VersionsTable({app}: Props) {
     setRefreshing(false)
   }
 
-  // The new version isn't in the registry until its build has run the tests and pushed the image
-  function handleReleased(version: string, buildId: string | null) {
-    setReleaseOpen(false)
-    toast.success(`Releasing ${version}`, {
-      description: buildId
-        ? `Build #${buildId} started. The version shows up here once the build has pushed it.`
-        : 'The build is queued. The version shows up here once the build has pushed it.',
-      action: buildId ? {label: 'View build', onClick: () => setSelectedId(buildId)} : undefined,
-    })
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -71,7 +59,7 @@ function VersionsTable({app}: Props) {
             <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
             Refresh
           </Button>
-          <Button onClick={() => setReleaseOpen(true)}>
+          <Button onClick={onReleaseClick}>
             <Tag/>
             Release
           </Button>
@@ -130,7 +118,6 @@ function VersionsTable({app}: Props) {
         )}
       </CardContent>
       <BuildDetailsDialog appId={app.id} buildId={selectedId} onClose={() => setSelectedId(null)}/>
-      <ReleaseDialog app={app} open={releaseOpen} onOpenChange={setReleaseOpen} onReleased={handleReleased}/>
     </Card>
   )
 }

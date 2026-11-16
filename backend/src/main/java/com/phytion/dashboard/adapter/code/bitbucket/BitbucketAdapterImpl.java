@@ -26,6 +26,7 @@ public class BitbucketAdapterImpl implements BitbucketAdapter {
     private final RestClient client;
     private final BitbucketProperties properties;
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final int MAX_TAGS = 100;
 
     @Autowired
     public BitbucketAdapterImpl(BitbucketProperties properties) {
@@ -64,6 +65,20 @@ public class BitbucketAdapterImpl implements BitbucketAdapter {
                     .body(new ParameterizedTypeReference<>() {
                     });
             return values(page).stream().map(BitbucketAdapterImpl::toCommit).toList();
+        });
+    }
+
+    @Override
+    public List<String> listTags(String workspace, String name) {
+        return call(() -> {
+            BitbucketJson.Page<BitbucketJson.Tag> page = client.get()
+                    // sort=-target.date: the tag on the newest commit first; 100 is Bitbucket's largest page
+                    .uri("/repositories/{workspace}/{repo}/refs/tags?sort=-target.date&pagelen={max}",
+                            workspace, name, MAX_TAGS)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+            return values(page).stream().map(BitbucketJson.Tag::name).toList();
         });
     }
 

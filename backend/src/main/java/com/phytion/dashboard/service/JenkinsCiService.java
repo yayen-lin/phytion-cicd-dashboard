@@ -3,6 +3,9 @@ package com.phytion.dashboard.service;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
@@ -16,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import static com.phytion.dashboard.model.CiBuildDetails.DASHBOARD;
+import static com.phytion.dashboard.service.ParallelCalls.await;
 
 /**
  * CI builds of the apps' pipelines.
@@ -44,23 +48,26 @@ public class JenkinsCiService {
      * @param appId the name of the app
      * @return the build, or empty when the CI tool has no such build
      * @throws AppNotFoundException when no configured app has that id
+     * @throws CiToolException      when the CI tool can't be reached
      */
     public Optional<CiBuildDetails> getBuild(String appId, String buildId) {
         App app = apps.getApp(appId);
         CiPipeline pipeline = app.pipeline();
-        return ci.getBuild(pipeline.job(), buildId).map(details -> audit.findBuildStarter(app.id(), buildId)
-                .map(username -> new CiBuildDetails(details.build(), username, DASHBOARD))
-                .orElseGet(() -> new CiBuildDetails(details.build(), details.startedBy(),
-                        details.startedBy() == null ? null : pipeline.tool())));
-    }
 
-    /**
-     * @param appId the name of the app
-     * @return the build's test results, or empty when it has none (or doesn't exist)
-     * @throws AppNotFoundException when no configured app has that id
-     */
-    public Optional<CiTestReport> getTestReport(String appId, String buildId) {
-        return ci.getTestReport(pipeline(appId).job(), buildId);
+        // read the build and its test report
+        Optional<CiBuildDetails> found;
+        Optional<CiTestReport> testReport;
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            CompletableFuture<Optional<CiTestReport>> testReportRead = CompletableFuture.supplyAsync(
+                    () -> ci.getTestReport(pipeline.job(), buildId), executor);
+            found = ci.getBuild(pipeline.job(), buildId);
+            testReport = await(testReportRead);
+        }
+
+        return found.map(details -> audit.findBuildStarter(app.id(), buildId)
+                .map(username -> new CiBuildDetails(details.build(), username, DASHBOARD, testReport.orElse(null)))
+                .orElseGet(() -> new CiBuildDetails(details.build(), details.startedBy(),
+                        details.startedBy() == null ? null : pipeline.tool(), testReport.orElse(null))));
     }
 
     /**

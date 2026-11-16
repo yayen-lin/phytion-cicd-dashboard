@@ -25,6 +25,11 @@ final class BitbucketJson {
     record Branch(String name, Commit target, Links links) {
     }
 
+    /** Each entry of GET /repositories/{workspace}/{repo}/refs/tags */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record Tag(String name) {
+    }
+
     /** Each entry of GET /repositories/{workspace}/{repo}/commits */
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Commit(String hash, OffsetDateTime date, String message, Author author, Links links) {

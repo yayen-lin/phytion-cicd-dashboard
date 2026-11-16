@@ -10,6 +10,7 @@ import java.util.List;
 
 import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.model.CodeBranch;
+import com.phytion.dashboard.model.CodeBranchCommits;
 import com.phytion.dashboard.model.CodeCommit;
 import com.phytion.dashboard.service.BitbucketCodeService;
 import com.phytion.dashboard.service.AppNotFoundException;
@@ -57,11 +58,14 @@ class BitbucketCodeControllerTests {
 
     @Test
     @WithMockUser
-    void listCommitsReturnsTheAppBranchAndCommits() throws Exception {
-        when(codeService.listCommits(APP, "main")).thenReturn(List.of(commit()));
+    void listCommitsReturnsTheBranchesThePickedBranchAndItsCommits() throws Exception {
+        when(codeService.listBranchCommits(APP, null)).thenReturn(new CodeBranchCommits(
+                List.of(new CodeBranch("main", commit(), "https://bitbucket.org/andy-test-app/sample-app/branch/main")),
+                "main", List.of(commit())));
 
-        mvc.perform(get("/api/code/commits").param("appId", APP).param("branch", "main"))
+        mvc.perform(get("/api/code/commits").param("appId", APP))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.branches[0].name").value("main"))
                 .andExpect(jsonPath("$.branch").value("main"))
                 .andExpect(jsonPath("$.commits[0].hash").value("cc99f6b"))
                 .andExpect(jsonPath("$.commits[0].author").value("Andy Lin"));
@@ -69,8 +73,12 @@ class BitbucketCodeControllerTests {
 
     @Test
     @WithMockUser
-    void listCommitsNeedsABranch() throws Exception {
-        mvc.perform(get("/api/code/commits").param("appId", APP)).andExpect(status().isBadRequest());
+    void listCommitsPassesTheAskedBranch() throws Exception {
+        when(codeService.listBranchCommits(APP, "dev")).thenReturn(new CodeBranchCommits(List.of(), null, List.of()));
+
+        mvc.perform(get("/api/code/commits").param("appId", APP).param("branch", "dev"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.branch").doesNotExist());
     }
 
     @Test

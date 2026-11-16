@@ -8,8 +8,17 @@ import org.springframework.validation.annotation.Validated;
 
 @Validated
 @ConfigurationProperties("dashboard")
-public record EnvironmentsProperties(@NotEmpty List<String> environments) {
+public record EnvironmentsProperties(@NotEmpty List<String> environments, List<String> confirmEnvironments) {
+
+    public EnvironmentsProperties {
+        confirmEnvironments = confirmEnvironments == null ? List.of() : confirmEnvironments;
+    }
+
     public boolean contains(String environment) {
         return environment != null && environments.contains(environment);
+    }
+
+    public boolean needsConfirmation(String environment) {
+        return confirmEnvironments.contains(environment);
     }
 }

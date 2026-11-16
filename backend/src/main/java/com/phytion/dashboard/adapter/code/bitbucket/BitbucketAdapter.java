@@ -22,6 +22,11 @@ public interface BitbucketAdapter {
     List<CodeCommit> listCommits(String workspace, String name, String branch);
 
     /**
+     * The names of a repo's tags, the newest commit's first (at most 100)
+     */
+    List<String> listTags(String workspace, String name);
+
+    /**
      * The url of a commit
      */
     String getCommitUrl(String workspace, String name, String hash);

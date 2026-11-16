@@ -52,7 +52,7 @@ function CommitHash({commit}: { commit: string }) {
   )
 }
 
-/** Loads one build from the backend and shows it. Mounted fresh for each build the dialog opens. */
+/** Loads one build with its test results (one request) and shows it. Mounted fresh for each build the dialog opens. */
 function BuildDetails({appId, buildId}: { appId: string, buildId: string }) {
   const [details, setDetails] = useState<CiBuildDetails | null>(null)
   const [error, setError] = useState('')
@@ -108,8 +108,8 @@ function BuildDetails({appId, buildId}: { appId: string, buildId: string }) {
 
           <section className="space-y-3 border-t pt-4">
             <h3 className="text-sm font-medium">Tests</h3>
-            {build.tests
-              ? <TestResults appId={appId} buildId={buildId}/>
+            {details.testReport
+              ? <TestResults report={details.testReport}/>
               : <p className="text-sm text-muted-foreground">
                   {build.status === 'RUNNING' ? 'Running...' : 'No test results (the build stopped before the tests).'}
                 </p>}

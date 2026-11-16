@@ -27,6 +27,12 @@ final class JenkinsJson {
             "number,result,inProgress,timestamp,duration,url,"
                     + "actions[lastBuiltRevision[SHA1,branch[name]],totalCount,failCount,skipCount,causes[userId,userName]]";
 
+    // BUILD_FIELDS plus what started the build and its parameters (version and env)
+    static final String PARAMETERIZED_BUILD_FIELDS =
+            "number,result,inProgress,timestamp,duration,url,"
+                    + "actions[lastBuiltRevision[SHA1,branch[name]],totalCount,failCount,skipCount,causes[userId,userName],"
+                    + "parameters[name,value]]";
+
     // A build's test report
     static final String TEST_REPORT_FIELDS =
             "duration,passCount,failCount,skipCount,suites[cases[className,name,status,duration,errorDetails,errorStackTrace]]";
@@ -48,7 +54,12 @@ final class JenkinsJson {
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Action(Revision lastBuiltRevision, List<Cause> causes, Integer totalCount, Integer failCount,
-                  Integer skipCount) {
+                  Integer skipCount, List<Parameter> parameters) {
+    }
+
+    /** One build parameter */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record Parameter(String name, Object value) {
     }
 
     /** GET /job/{job}/{number}/testReport/api/json. Durations are in seconds. */

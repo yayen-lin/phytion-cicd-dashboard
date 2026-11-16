@@ -1,5 +1,6 @@
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router'
-import { Activity, Boxes, ClipboardList, Code, Hammer, History, House, Rocket, Tag, Workflow } from 'lucide-react'
+import { Boxes, History, LayoutDashboard, Server, Users, Workflow } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -8,26 +9,47 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSkeleton,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { getConfiguredEnvironments } from '@/api/environments'
 
-/** The CI/CD stages, in pipeline order. Stages without a path aren't built yet. */
-const stages = [
-  { label: 'Code', icon: Code, path: '/code' },
-  { label: 'Build & Test', icon: Hammer, path: '/build' },
-  { label: 'Release', icon: Tag, path: '/release' },
-  { label: 'Deploy', icon: Rocket },
-  { label: 'Operate', icon: Boxes },
-  { label: 'Monitor', icon: Activity },
-  { label: 'Plan', icon: ClipboardList },
-]
+type MenuLinkProps = {
+  label: string
+  icon: typeof Server
+  path: string
+  isActive: boolean
+}
 
-/** The left sidebar: logo and Home (both link to the landing page), and the CI/CD stages. The current page's item is highlighted. */
+/** One sidebar link, highlighted when its page is open */
+function MenuLink({ label, icon: Icon, path, isActive }: MenuLinkProps) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
+        <NavLink to={path}>
+          <Icon />
+          <span>{label}</span>
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  )
+}
+
+/** The left sidebar: logo, Overview and Apps, one link per configured environment, and Management (History, Users). */
 function LeftMenuBar() {
   const { pathname } = useLocation()
+  // null while loading
+  const [environmentNames, setEnvironmentNames] = useState<string[] | null>(null)
+  const [environmentsError, setEnvironmentsError] = useState(false)
+
+  // load the environments from the backend's config
+  useEffect(() => {
+    getConfiguredEnvironments()
+      .then((environments) => setEnvironmentNames(environments.map((e) => e.name)))
+      .catch(() => setEnvironmentsError(true))
+  }, [])
 
   return (
     <Sidebar collapsible="icon">
@@ -50,55 +72,50 @@ function LeftMenuBar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                {/* Exact match: every path starts with "/" */}
-                <SidebarMenuButton asChild isActive={pathname === '/'} tooltip="Home">
-                  <NavLink to="/" end>
-                    <House />
-                    <span>Home</span>
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {/* exact match: every path starts with "/" */}
+              <MenuLink label="Overview" icon={LayoutDashboard} path="/" isActive={pathname === '/'} />
+              <MenuLink label="Apps" icon={Boxes} path="/apps" isActive={pathname.startsWith('/apps')} />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
         <SidebarGroup>
-          <SidebarGroupLabel>Stages</SidebarGroupLabel>
+          <SidebarGroupLabel>Environments</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {stages.map(({ label, icon: Icon, path }) => (
-                <SidebarMenuItem key={label}>
-                  {path ? (
-                    <SidebarMenuButton asChild isActive={pathname.startsWith(path)} tooltip={label}>
-                      <NavLink to={path}>
-                        <Icon />
-                        <span>{label}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  ) : (
-                    <>
-                      <SidebarMenuButton disabled tooltip={`${label} (not yet)`}>
-                        <Icon />
-                        <span>{label}</span>
-                      </SidebarMenuButton>
-                      <SidebarMenuBadge className="text-muted-foreground">soon</SidebarMenuBadge>
-                    </>
-                  )}
+              {environmentsError ? (
+                <SidebarMenuItem>
+                  <SidebarMenuButton disabled tooltip="Could not load the environments">
+                    <Server />
+                    <span>Could not load</span>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
-              ))}
+              ) : !environmentNames ? (
+                [0, 1, 2].map((i) => (
+                  <SidebarMenuItem key={i}>
+                    <SidebarMenuSkeleton showIcon />
+                  </SidebarMenuItem>
+                ))
+              ) : (
+                environmentNames.map((name) => (
+                  <MenuLink key={name} label={name} icon={Server} path={`/environments/${encodeURIComponent(name)}`}
+                            isActive={pathname === `/environments/${encodeURIComponent(name)}`} />
+                ))
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
         <SidebarGroup>
-          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
+          <SidebarGroupLabel>Management</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              <MenuLink label="History" icon={History} path="/history" isActive={pathname.startsWith('/history')} />
+              {/* no Users page yet: users are in a file for now */}
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/history')} tooltip="History">
-                  <NavLink to="/history">
-                    <History />
-                    <span>History</span>
-                  </NavLink>
+                <SidebarMenuButton disabled tooltip="Users">
+                  <Users />
+                  <span>Users</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

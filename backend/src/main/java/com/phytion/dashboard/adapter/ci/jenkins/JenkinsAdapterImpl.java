@@ -8,9 +8,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.model.CiBuildDetails;
+import com.phytion.dashboard.model.CiParameterizedBuild;
 import com.phytion.dashboard.model.CiTestCase;
 import com.phytion.dashboard.model.CiTestCounts;
 import com.phytion.dashboard.model.CiTestReport;
@@ -67,6 +69,23 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
     }
 
     @Override
+    public List<CiParameterizedBuild> listParameterizedBuilds(String job) {
+        return call(() -> {
+            String tree = "builds[" + JenkinsJson.PARAMETERIZED_BUILD_FIELDS + "]{0," + properties.maxBuilds() + "}";
+            JenkinsJson.Job response = jenkins.get()
+                    .uri("/job/{job}/api/json?tree={tree}", job, tree)
+                    .retrieve()
+                    .body(JenkinsJson.Job.class);
+            if (response == null || response.builds() == null) {
+                return List.of();
+            }
+            return response.builds().stream()
+                    .map(build -> new CiParameterizedBuild(toCiBuild(build), parameters(build), startedBy(build)))
+                    .toList();
+        });
+    }
+
+    @Override
     public Optional<CiBuildDetails> getBuild(String job, String buildId) {
         return call(() -> {
             try {
@@ -74,7 +93,7 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                         .uri("/job/{job}/{id}/api/json?tree={tree}", job, buildId, JenkinsJson.BUILD_DETAIL_FIELDS)
                         .retrieve()
                         .body(JenkinsJson.Build.class);
-                return Optional.ofNullable(build).map(b -> new CiBuildDetails(toCiBuild(b), startedBy(b), null));
+                return Optional.ofNullable(build).map(b -> new CiBuildDetails(toCiBuild(b), startedBy(b), null, null));
             } catch (HttpClientErrorException.NotFound e) {
                 return Optional.empty();
             }
@@ -251,6 +270,21 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
 
     private static long secondsToMillis(double seconds) {
         return Math.round(seconds * 1000);
+    }
+
+    /**
+     * The build's parameters as text, e.g. {VERSION=1.0.1, ENVIRONMENT=staging}; empty when it has none
+     */
+    private static Map<String, String> parameters(JenkinsJson.Build build) {
+        if (build.actions() == null) {
+            return Map.of();
+        }
+        return build.actions().stream()
+                .filter(action -> action.parameters() != null)
+                .flatMap(action -> action.parameters().stream())
+                .filter(parameter -> parameter.name() != null && parameter.value() != null)
+                .collect(Collectors.toMap(JenkinsJson.Parameter::name, parameter -> String.valueOf(parameter.value()),
+                        (first, second) -> first));
     }
 
     /**

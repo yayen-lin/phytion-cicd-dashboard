@@ -82,31 +82,6 @@ class JenkinsCiControllerTests {
 
     @Test
     @WithMockUser
-    void getTestReportReturnsCountsAndCases() throws Exception {
-        when(ciService.getTestReport("sample-app", "2")).thenReturn(Optional.of(new CiTestReport(
-                new CiTestCounts(1, 1, 0), 941L, List.of(
-                new CiTestCase("com.phytion.sampleapp.HelloControllerTests", "helloReturnsMessage()",
-                        CiTestCase.Status.FAILED, 14L, "expected: <hello> but was: <hi>")))));
-
-        mvc.perform(get("/api/ci/builds/2/tests").param("appId", "sample-app"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.counts.failed").value(1))
-                .andExpect(jsonPath("$.durationMillis").value(941))
-                .andExpect(jsonPath("$.cases[0].status").value("FAILED"))
-                .andExpect(jsonPath("$.cases[0].errorMessage").value("expected: <hello> but was: <hi>"));
-    }
-
-    @Test
-    @WithMockUser
-    void getTestReportOfBuildWithoutTestsGives404() throws Exception {
-        when(ciService.getTestReport("sample-app", "3")).thenReturn(Optional.empty());
-
-        mvc.perform(get("/api/ci/builds/3/tests").param("appId", "sample-app"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    @WithMockUser
     void ciToolFailureGives502WithTheReason() throws Exception {
         when(ciService.listBuilds("sample-app")).thenThrow(new CiToolException("Jenkins not reachable"));
 
@@ -117,18 +92,22 @@ class JenkinsCiControllerTests {
 
     @Test
     @WithMockUser
-    void getBuildReturnsTheBuildAndWhoStartedIt() throws Exception {
+    void getBuildReturnsTheBuildWhoStartedItAndItsTests() throws Exception {
         when(ciService.getBuild("sample-app", "2")).thenReturn(Optional.of(new CiBuildDetails(
                 new CiBuild("2", CiBuild.Status.SUCCESS, "cc99f6b", "main",
                         Instant.parse("2026-11-03T10:00:00Z"), 5516L, "http://jenkins/job/sample-app/2/", null),
-                "andy", "dashboard")));
+                "andy", "dashboard", new CiTestReport(new CiTestCounts(1, 1, 0), 941L, List.of(
+                new CiTestCase("com.phytion.sampleapp.HelloControllerTests", "helloReturnsMessage()",
+                        CiTestCase.Status.FAILED, 14L, "expected: <hello> but was: <hi>"))))));
 
         mvc.perform(get("/api/ci/builds/2").param("appId", "sample-app"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.build.id").value("2"))
                 .andExpect(jsonPath("$.build.status").value("SUCCESS"))
                 .andExpect(jsonPath("$.startedBy").value("andy"))
-                .andExpect(jsonPath("$.startedBySource").value("dashboard"));
+                .andExpect(jsonPath("$.startedBySource").value("dashboard"))
+                .andExpect(jsonPath("$.testReport.counts.failed").value(1))
+                .andExpect(jsonPath("$.testReport.cases[0].errorMessage").value("expected: <hello> but was: <hi>"));
     }
 
     @Test

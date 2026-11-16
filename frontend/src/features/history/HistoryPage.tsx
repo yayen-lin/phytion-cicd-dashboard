@@ -6,9 +6,7 @@ import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} f
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Skeleton} from '@/components/ui/skeleton'
-import {getAuditLog, type AuditEntry, type AuditFilter} from '@/api/audit'
-import {getApps} from '@/api/apps'
-import {getBuilds, type CiBuild} from '@/api/ci'
+import {getHistory, type AuditActionResult, type AuditEntry, type History} from '@/api/history'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import {formatActionType} from '@/lib/format'
 import AuditTable from './AuditTable'
@@ -49,11 +47,8 @@ function FilterSelect({label, value, options, onChange}: FilterSelectProps) {
  */
 function HistoryPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [entries, setEntries] = useState<AuditEntry[] | null>(null)
-  // The configured apps' ids: only their builds can be looked up and opened
-  const [appIds, setAppIds] = useState<string[]>([])
-  // Each app's recent builds, for the build status column
-  const [builds, setBuilds] = useState<Record<string, CiBuild[]>>({})
+  // null while loading
+  const [history, setHistory] = useState<History | null>(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   // The build shown in the details modal, or null when it is closed
@@ -62,26 +57,15 @@ function HistoryPage() {
   const target = searchParams.get('target') ?? undefined
   const actionType = searchParams.get('actionType') ?? undefined
   const username = searchParams.get('username') ?? undefined
-  const actionResult = (searchParams.get('actionResult') ?? undefined) as AuditFilter['actionResult']
+  const actionResult = (searchParams.get('actionResult') ?? undefined) as AuditActionResult | undefined
 
-  // Loads the whole (recent) log once; the filters only pick rows from it, without asking the server again
+  // Loads the whole (recent) log with its builds in one request; the filters only pick rows from it
   const loadHistory = useCallback(() => {
-    return Promise.all([
-      getAuditLog(),
-      getApps(),
-    ])
-      .then(([log, apps]) => {
-        setEntries(log)
+    return getHistory()
+      .then((data) => {
+        setHistory(data)
         setError('')
-
-        // The builds of each app in the table, once per app. If the CI tool is down, that column shows "-"
-        const ids = apps.map((a) => a.id)
-        setAppIds(ids)
-        const shown = [...new Set(log.map((e) => e.target))].filter((t) => ids.includes(t))
-        return Promise.all(shown.map((appId) =>
-          getBuilds(appId).then((data) => [appId, data.builds] as const).catch(() => [appId, []] as const)))
       })
-      .then((results) => setBuilds(Object.fromEntries(results)))
       .catch(() => setError('Could not load the audit log'))
   }, [])
 
@@ -104,6 +88,7 @@ function HistoryPage() {
   }
 
   // The values each dropdown can pick: the ones in the loaded log, sorted
+  const entries = history?.entries.map((item) => item.entry)
   const distinct = (pick: (e: AuditEntry) => string) => [...new Set((entries ?? []).map(pick))].sort()
   const options = {
     targets: distinct((e) => e.target),
@@ -112,7 +97,7 @@ function HistoryPage() {
   }
 
   const filtered = filterKeys.some((key) => searchParams.has(key))
-  const shownEntries = entries?.filter((e) =>
+  const shownEntries = history?.entries.filter(({entry: e}) =>
     (!target || e.target === target)
     && (!actionType || e.actionType === actionType)
     && (!username || e.username === username)
@@ -171,13 +156,16 @@ function HistoryPage() {
               {filtered ? 'No actions match these filters.' : 'No actions yet.'}
             </p>
           ) : (
-            <AuditTable
-              entries={shownEntries}
-              showTarget
-              buildOf={(entry) => builds[entry.target]?.find((b) => b.id === entry.buildId)}
-              canOpenBuild={(entry) => appIds.includes(entry.target)}
-              onOpenBuild={(entry) => entry.buildId && setSelected({appId: entry.target, buildId: entry.buildId})}
-            />
+            <>
+              {history?.unavailable.includes('BUILDS') && (
+                <p className="mb-2 text-sm text-muted-foreground">The CI tool couldn't be reached, so build statuses are missing.</p>
+              )}
+              <AuditTable
+                entries={shownEntries}
+                showTarget
+                onOpenBuild={({entry}) => entry.buildId && setSelected({appId: entry.target, buildId: entry.buildId})}
+              />
+            </>
           )}
         </CardContent>
       </Card>

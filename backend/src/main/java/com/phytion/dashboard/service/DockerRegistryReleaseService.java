@@ -6,6 +6,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -16,10 +19,14 @@ import com.phytion.dashboard.adapter.release.dockerregistry.DockerRegistryAdapte
 import com.phytion.dashboard.adapter.release.dockerregistry.DockerRegistryProperties;
 import com.phytion.dashboard.model.App;
 import com.phytion.dashboard.model.AuditEntry;
+import com.phytion.dashboard.model.CodeBranchCommits;
+import com.phytion.dashboard.model.ReleaseDraft;
 import com.phytion.dashboard.model.ReleaseImage;
 import com.phytion.dashboard.model.ReleaseVersion;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import static com.phytion.dashboard.service.ParallelCalls.await;
 
 /**
  * Released versions of the apps, and releasing a new one (recorded in the audit log).
@@ -50,6 +57,9 @@ public class DockerRegistryReleaseService {
     // jenkins job parameter
     private static final String GIT_REF = "GIT_REF";
 
+    // default version for an app's first release
+    private static final String FIRST_VERSION = "v0.0.1";
+
     private static final Comparator<String> NEWEST_FIRST = Comparator
             .comparing(DockerRegistryReleaseService::parseVersionString, Comparator.nullsLast(VersionNumber.HIGHEST_FIRST))
             .thenComparing(Comparator.naturalOrder());
@@ -68,6 +78,20 @@ public class DockerRegistryReleaseService {
                 .limit(registryProperties.maxVersions())
                 .map(tag -> toVersion(appId, tag, release.getLabels(image.image(), tag)))
                 .toList();
+    }
+
+    /**
+     * The highest version of an app, returns empty when the app has no versions yet.
+     *
+     * @param appId the name of the app
+     * @throws AppNotFoundException when no configured app has that id, or the app isn't released
+     * @throws ReleaseToolException when the registry can't be reached
+     */
+    public Optional<ReleaseVersion> findLatestVersion(String appId) {
+        ReleaseImage image = getReleaseImage(appId);
+        return release.listTags(image.image()).stream()
+                .min(NEWEST_FIRST)
+                .map(tag -> toVersion(appId, tag, release.getLabels(image.image(), tag)));
     }
 
     /**
@@ -91,6 +115,41 @@ public class DockerRegistryReleaseService {
     public Optional<ReleaseVersion> findVersion(String appId, String version) {
         Map<String, String> labels = release.getLabels(getReleaseImage(appId).image(), version);
         return labels.isEmpty() ? Optional.empty() : Optional.of(toVersion(appId, version, labels));
+    }
+
+    /**
+     * What the Release dialog starts with.
+     *
+     * @param appId       the name of the app
+     * @param branch      the branch whose commits to list, or null for main (else master, else the newest branch)
+     * @param withCommits false when the commit is already picked, so only the next version is read
+     * @throws AppNotFoundException when no configured app has that id, or the app isn't released
+     * @throws CodeToolException    when the code tool can't be reached
+     */
+    public ReleaseDraft draftRelease(String appId, String branch, boolean withCommits) {
+        getReleaseImage(appId);
+
+        // read the tags and the branches with their commits at the same time
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            CompletableFuture<CodeBranchCommits> commitsRead = withCommits
+                    ? CompletableFuture.supplyAsync(() -> code.listBranchCommits(appId, branch), executor)
+                    : CompletableFuture.completedFuture(null);
+            String nextVersion = nextVersion(code.listTags(appId));
+            return new ReleaseDraft(nextVersion, await(commitsRead));
+        }
+    }
+
+    /**
+     * The highest release tag with its last number bumped.
+     */
+    static String nextVersion(List<String> tags) {
+        return tags.stream()
+                .map(RELEASE_TAG::matcher)
+                .filter(Matcher::matches)
+                .map(matcher -> parseVersionString(matcher.group(1)))
+                .min(VersionNumber.HIGHEST_FIRST)
+                .map(highest -> "v" + highest.major() + "." + highest.minor() + "." + (highest.patch() + 1))
+                .orElse(FIRST_VERSION);
     }
 
     /**

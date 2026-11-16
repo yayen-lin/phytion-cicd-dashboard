@@ -14,6 +14,9 @@ import java.util.Optional;
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.adapter.release.ReleaseToolException;
+import com.phytion.dashboard.model.CodeBranch;
+import com.phytion.dashboard.model.CodeBranchCommits;
+import com.phytion.dashboard.model.ReleaseDraft;
 import com.phytion.dashboard.model.ReleaseVersion;
 import com.phytion.dashboard.service.AppNotFoundException;
 import com.phytion.dashboard.service.InvalidReleaseException;
@@ -46,6 +49,32 @@ class DockerRegistryReleaseControllerTests {
 
     @MockitoBean
     private DockerRegistryReleaseService releaseService;
+
+    @Test
+    @WithMockUser
+    void draftReleaseReturnsTheNextVersionAndTheBranchesWithCommits() throws Exception {
+        when(releaseService.draftRelease(APP, null, true)).thenReturn(new ReleaseDraft("v1.0.3",
+                new CodeBranchCommits(List.of(new CodeBranch("main", null, "https://bitbucket.org/x/main")), "main",
+                        List.of())));
+
+        mvc.perform(get("/api/release/draft").param("appId", APP))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nextVersion").value("v1.0.3"))
+                .andExpect(jsonPath("$.branches[0].name").value("main"))
+                .andExpect(jsonPath("$.branch").value("main"));
+    }
+
+    @Test
+    @WithMockUser
+    void draftReleaseWithoutCommitsHasOnlyTheNextVersion() throws Exception {
+        when(releaseService.draftRelease(APP, null, false)).thenReturn(new ReleaseDraft("v0.0.1", null));
+
+        mvc.perform(get("/api/release/draft").param("appId", APP).param("withCommits", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nextVersion").value("v0.0.1"))
+                .andExpect(jsonPath("$.branches").doesNotExist())
+                .andExpect(jsonPath("$.commits").doesNotExist());
+    }
 
     @Test
     void listVersionsNeedsLogin() throws Exception {
