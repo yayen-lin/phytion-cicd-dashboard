@@ -34,7 +34,7 @@ type Props = {
 }
 
 /** A started deploy: which version went where, and the deploy build (null id while queued) */
-type StartedDeploy = {
+export type StartedDeploy = {
   version: string
   environment: string
   buildId: string | null
@@ -169,7 +169,7 @@ function DeployForm({appId, environments, pickedEnvironment, onStarted}: Pick<Pr
 }
 
 /** The started deploy's build: its status, a refresh button, and a link to it in the CI tool. */
-function StartedDeployView({appId, started}: { appId: string, started: StartedDeploy }) {
+export function StartedDeployView({appId, started}: { appId: string, started: StartedDeploy }) {
   // null while loading
   const [build, setBuild] = useState<CiBuild | null>(null)
   const [error, setError] = useState('')

@@ -11,7 +11,9 @@ import java.time.Instant;
 import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
+import com.phytion.dashboard.adapter.operate.OperateToolException;
 import com.phytion.dashboard.model.CiBuild;
+import com.phytion.dashboard.model.Promotion;
 import com.phytion.dashboard.service.AppNotFoundException;
 import com.phytion.dashboard.service.InvalidDeployException;
 import com.phytion.dashboard.service.JenkinsDeployService;
@@ -35,6 +37,9 @@ class JenkinsDeployControllerTests {
     private static final String APP = "sample-app";
     private static final String DEPLOY = """
             {"appId": "sample-app", "version": "1.0.1", "environment": "staging"}
+            """;
+    private static final String PROMOTE = """
+            {"appId": "sample-app", "fromEnvironment": "dev"}
             """;
 
     @Autowired
@@ -140,5 +145,65 @@ class JenkinsDeployControllerTests {
 
     private static MockHttpServletRequestBuilder postDeploy(String json) {
         return post("/api/deploy/deployments").contentType(MediaType.APPLICATION_JSON).content(json);
+    }
+
+    @Test
+    void promoteNeedsLogin() throws Exception {
+        mvc.perform(postPromote(PROMOTE).with(csrf())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void promoteNeedsCsrfToken() throws Exception {
+        mvc.perform(postPromote(PROMOTE)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "andy")
+    void promotePassesTheLoggedInUserAndReturnsThePromotion() throws Exception {
+        when(deployService.promote(APP, "dev", "andy"))
+                .thenReturn(new Promotion(APP, "1.0.1", "dev", "staging", "4"));
+
+        mvc.perform(postPromote(PROMOTE).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appId").value(APP))
+                .andExpect(jsonPath("$.version").value("1.0.1"))
+                .andExpect(jsonPath("$.fromEnvironment").value("dev"))
+                .andExpect(jsonPath("$.toEnvironment").value("staging"))
+                .andExpect(jsonPath("$.buildId").value("4"));
+    }
+
+    @Test
+    @WithMockUser
+    void promoteWithoutEnvironmentGives400() throws Exception {
+        mvc.perform(postPromote("""
+                {"appId": "sample-app"}
+                """).with(csrf())).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "andy")
+    void promoteWithNothingRunningGives400WithTheReason() throws Exception {
+        when(deployService.promote(APP, "dev", "andy"))
+                .thenThrow(new InvalidDeployException("sample-app has no version running in dev"));
+
+        mvc.perform(postPromote(PROMOTE).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("sample-app has no version running in dev"));
+    }
+
+    @Test
+    @WithMockUser(username = "andy")
+    void promoteWhenKubernetesIsDownGives502WithTheReason() throws Exception {
+        when(deployService.promote(APP, "dev", "andy"))
+                .thenThrow(new OperateToolException("Kubernetes not reachable"));
+
+        mvc.perform(postPromote(PROMOTE).with(csrf()))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error").value("Kubernetes not reachable"));
+    }
+
+    private static MockHttpServletRequestBuilder postPromote(String json) {
+        return post("/api/deploy/promotions").contentType(MediaType.APPLICATION_JSON).content(json);
     }
 }

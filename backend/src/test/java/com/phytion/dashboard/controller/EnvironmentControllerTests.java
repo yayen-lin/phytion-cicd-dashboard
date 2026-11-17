@@ -29,14 +29,14 @@ class EnvironmentControllerTests {
 
     @Test
     @WithMockUser
-    void environmentsComeFromTheConfigInOrderAndOnlyProdNeedsConfirmation() throws Exception {
+    void environmentsComeFromTheConfigInOrderAndAllButDevNeedConfirmation() throws Exception {
         mvc.perform(get("/api/environments"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[0].name").value("dev"))
                 .andExpect(jsonPath("$[0].needsConfirmation").value(false))
                 .andExpect(jsonPath("$[1].name").value("staging"))
-                .andExpect(jsonPath("$[1].needsConfirmation").value(false))
+                .andExpect(jsonPath("$[1].needsConfirmation").value(true))
                 .andExpect(jsonPath("$[2].name").value("prod"))
                 .andExpect(jsonPath("$[2].needsConfirmation").value(true));
     }

@@ -269,6 +269,21 @@ class DockerRegistryReleaseServiceTests {
     }
 
     @Test
+    void isHigherVersionComparesByNumber() {
+        assertThat(DockerRegistryReleaseService.isHigherVersion("1.10.0", "1.9.2")).isTrue();
+        assertThat(DockerRegistryReleaseService.isHigherVersion("2.0.0", "1.99.99")).isTrue();
+        assertThat(DockerRegistryReleaseService.isHigherVersion("1.0.1", "1.0.1")).isFalse();
+        assertThat(DockerRegistryReleaseService.isHigherVersion("1.0.9", "1.0.10")).isFalse();
+    }
+
+    @Test
+    void isHigherVersionOfAVersionInAnotherFormatIsFalse() {
+        assertThat(DockerRegistryReleaseService.isHigherVersion("latest", "1.0.1")).isFalse();
+        assertThat(DockerRegistryReleaseService.isHigherVersion("1.0.1", "latest")).isFalse();
+        assertThat(DockerRegistryReleaseService.isHigherVersion(null, "1.0.1")).isFalse();
+    }
+
+    @Test
     void nextVersionOfAnAppNeverReleasedIsTheFirst() {
         assertThat(DockerRegistryReleaseService.nextVersion(List.of())).isEqualTo("v0.0.1");
         assertThat(DockerRegistryReleaseService.nextVersion(List.of("nightly"))).isEqualTo("v0.0.1");

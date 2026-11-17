@@ -9,3 +9,4 @@
    - Comment code in paragraphs: split a method into blocks of related lines with a blank line between them,
      and put a short lowercase comment above each block saying what it does.
    - Less repetition in comments.
+5. Don't start the backend or frontend; I run them myself. Ask me to do the steps that need them.

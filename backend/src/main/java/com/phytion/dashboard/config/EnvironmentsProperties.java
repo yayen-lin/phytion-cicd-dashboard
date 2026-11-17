@@ -1,6 +1,7 @@
 package com.phytion.dashboard.config;
 
 import java.util.List;
+import java.util.Optional;
 
 import jakarta.validation.constraints.NotEmpty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -20,5 +21,16 @@ public record EnvironmentsProperties(@NotEmpty List<String> environments, List<S
 
     public boolean needsConfirmation(String environment) {
         return confirmEnvironments.contains(environment);
+    }
+
+    /**
+     * Returns the next environment in the config, or empty for the last one or one
+     */
+    public Optional<String> nextEnvironment(String environment) {
+        int index = environments.indexOf(environment);
+        if (index < 0 || index == environments.size() - 1) {
+            return Optional.empty();
+        }
+        return Optional.of(environments.get(index + 1));
     }
 }

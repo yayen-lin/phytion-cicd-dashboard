@@ -107,7 +107,6 @@ function HistoryPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">History</h1>
-        <p className="text-sm text-muted-foreground">Every action taken through the dashboard: who did what, to what, and when</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

@@ -1,10 +1,10 @@
 import {useCallback, useEffect, useState, type KeyboardEvent} from 'react'
 import {useNavigate} from 'react-router'
 import {toast} from 'sonner'
-import {MoreHorizontal, Play, RefreshCw, Rocket, Tag} from 'lucide-react'
+import {ArrowUpRight, MoreHorizontal, Play, RefreshCw, Rocket, Tag} from 'lucide-react'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ import type {Environment} from '@/api/environments'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import StatusBadge from '@/features/build/StatusBadge'
 import DeployDialog from '@/features/deploy/DeployDialog'
+import PromoteDialog, {type PromoteChoice} from '@/features/deploy/PromoteDialog'
 import ReleaseDialog from '@/features/release/ReleaseDialog'
 import {showReleaseStarted} from '@/features/release/releaseToast'
 import {cn} from '@/lib/utils'
@@ -49,8 +50,21 @@ function EnvironmentCell({summary, environment}: { summary: AppSummary, environm
 }
 
 /**
+ * What an app can promote: each environment but the last where a version runs, with the environment after it.
+ * e.g. sample-app 1.0.1 in dev only -> [{version: "1.0.1", fromEnvironment: "dev", toEnvironment: staging}]
+ * Returns none when the app isn't deployed or the operate tool couldn't be reached.
+ */
+function promoteChoices(summary: AppSummary, environments: Environment[]): PromoteChoice[] {
+  if (!summary.app.deploy || summary.unavailable.includes('ENVIRONMENTS')) return []
+  return environments.slice(0, -1).flatMap((from, i) => {
+    const version = summary.deployments.find((d) => d.environment === from.name)?.state.version
+    return version ? [{version, fromEnvironment: from.name, toEnvironment: environments[i + 1]}] : []
+  })
+}
+
+/**
  * Every app (/apps): latest build, latest version and what runs in each environment, from one request.
- * A row's menu runs a build, releases or deploys; clicking a row opens the app's page.
+ * A row's menu runs a build, releases, deploys or promotes; clicking a row opens the app's page.
  */
 function AppsPage() {
   const navigate = useNavigate()
@@ -61,6 +75,8 @@ function AppsPage() {
   // the app whose Release or Deploy dialog is open, or null when both are closed
   const [releasing, setReleasing] = useState<App | null>(null)
   const [deploying, setDeploying] = useState<App | null>(null)
+  // the app and what it can promote, of the open Promote dialog, or null when it is closed
+  const [promoting, setPromoting] = useState<{ appId: string, choices: PromoteChoice[] } | null>(null)
   // the build shown in the details modal, or null when it is closed
   const [selectedBuild, setSelectedBuild] = useState<{ appId: string, buildId: string } | null>(null)
 
@@ -124,13 +140,11 @@ function AppsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Apps</h1>
-        <p className="text-sm text-muted-foreground">Each app's latest build, latest version, and what runs in each environment</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Apps</CardTitle>
-          <CardDescription>Click an app to see its commits, builds, versions and environments</CardDescription>
           <CardAction>
             <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
               <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
@@ -205,6 +219,16 @@ function AppsPage() {
                           <DropdownMenuItem disabled={!s.app.release || !s.app.deploy} onSelect={() => setDeploying(s.app)}>
                             <Rocket/> Deploy
                           </DropdownMenuItem>
+                          {/* disabled when nothing runs in any environment but the last */}
+                          {(() => {
+                            const choices = promoteChoices(s, summary.environments)
+                            return (
+                              <DropdownMenuItem disabled={choices.length === 0}
+                                                onSelect={() => setPromoting({appId: s.app.id, choices})}>
+                                <ArrowUpRight/> Promote
+                              </DropdownMenuItem>
+                            )
+                          })()}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -223,6 +247,10 @@ function AppsPage() {
       {deploying && summary && (
         <DeployDialog appId={deploying.id} environments={summary.environments} open
                       onOpenChange={(open) => !open && setDeploying(null)} onDeployed={loadSummary}/>
+      )}
+      {promoting && (
+        <PromoteDialog appId={promoting.appId} choices={promoting.choices}
+                       open onOpenChange={(open) => !open && setPromoting(null)} onPromoted={loadSummary}/>
       )}
       <BuildDetailsDialog appId={selectedBuild?.appId ?? ''} buildId={selectedBuild?.buildId ?? null}
                           onClose={() => setSelectedBuild(null)}/>

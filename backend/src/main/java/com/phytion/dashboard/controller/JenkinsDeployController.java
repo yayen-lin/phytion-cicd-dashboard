@@ -1,6 +1,7 @@
 package com.phytion.dashboard.controller;
 
 import com.phytion.dashboard.model.CiBuild;
+import com.phytion.dashboard.model.Promotion;
 import com.phytion.dashboard.service.JenkinsDeployService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -34,6 +35,14 @@ public class JenkinsDeployController {
     }
 
     /**
+     * Starts the app's deploy job with the version running in an environment to the next environment
+     */
+    @PostMapping("/api/deploy/promotions")
+    public Promotion promote(@RequestBody @Valid PromoteRequest request, Authentication authentication) {
+        return deployService.promote(request.appId(), request.fromEnvironment(), authentication.getName());
+    }
+
+    /**
      * One build of the app's deploy job
      */
     @GetMapping("/api/deploy/deployments/{buildId}")
@@ -47,6 +56,13 @@ public class JenkinsDeployController {
      * @param environment where to deploy it
      */
     public record DeployRequest(@NotBlank String appId, @NotBlank String version, @NotBlank String environment) {
+    }
+
+    /**
+     * @param appId           the name of the app
+     * @param fromEnvironment the environment whose running version moves to the next one
+     */
+    public record PromoteRequest(@NotBlank String appId, @NotBlank String fromEnvironment) {
     }
 
     /**

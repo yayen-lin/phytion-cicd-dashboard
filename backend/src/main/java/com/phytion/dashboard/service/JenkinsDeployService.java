@@ -2,11 +2,15 @@ package com.phytion.dashboard.service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
+import com.phytion.dashboard.adapter.operate.OperateToolException;
+import com.phytion.dashboard.adapter.operate.kubernetes.KubernetesAdapter;
 import com.phytion.dashboard.adapter.release.ReleaseToolException;
 import com.phytion.dashboard.config.EnvironmentsProperties;
 import com.phytion.dashboard.model.App;
@@ -16,17 +20,17 @@ import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiParameterizedBuild;
 import com.phytion.dashboard.model.DeployRun;
+import com.phytion.dashboard.model.OperateWorkload;
+import com.phytion.dashboard.model.Promotion;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-/**
- * Deploying a released version of an app to an environment.
- */
 @Service
 @RequiredArgsConstructor
 public class JenkinsDeployService {
 
     private final JenkinsAdapter jenkins;
+    private final KubernetesAdapter kubernetes;
     private final DockerRegistryReleaseService releases;
     private final AuditService audit;
     private final AppService apps;
@@ -51,9 +55,10 @@ public class JenkinsDeployService {
         }
         List<CiParameterizedBuild> builds = jenkins.listParameterizedBuilds(app.deploy().job());
 
-        // who started each build from the dashboard: the CI tool only knows the dashboard's own user
-        Map<String, String> dashboardUsers = audit.getRecentEntries(new AuditFilter(appId, AuditEntry.ActionType.DEPLOY,
-                        null, AuditEntry.ActionResult.SUCCESS, null, null, null)).stream()
+        // who started each build from the dashboard
+        Map<String, String> dashboardUsers = Stream.of(AuditEntry.ActionType.DEPLOY, AuditEntry.ActionType.PROMOTE)
+                .flatMap(actionType -> audit.getRecentEntries(new AuditFilter(appId, actionType, null,
+                        AuditEntry.ActionResult.SUCCESS, null, null, null)).stream())
                 .filter(entry -> entry.getBuildId() != null)
                 .collect(Collectors.toMap(AuditEntry::getBuildId, AuditEntry::getUsername, (newest, older) -> newest));
 
@@ -137,5 +142,108 @@ public class JenkinsDeployService {
                     auditMessage + ": " + e.getMessage(), environment, version);
             throw e;
         }
+    }
+
+    /**
+     * Deploys the version running in an environment to the next environment and records it.
+     *
+     * @param appId           the name of the app
+     * @param fromEnvironment one of the configured environments, not the last
+     * @param username        who promotes it
+     * @return the promotion, with the deploy build's id, or null for it when the CI tool hasn't started the build yet
+     * @throws InvalidDeployException when no app is given, the environment doesn't exist or is the last, no version
+     *                                runs there, the next environment runs the same or a higher version, or the
+     *                                version isn't released
+     * @throws AppNotFoundException   when no configured app has that id, or the app isn't released or deployed
+     * @throws OperateToolException   when Kubernetes can't be reached to read the running versions
+     * @throws ReleaseToolException   when the registry can't be reached to check the version
+     * @throws CiToolException        when the deploy job didn't start
+     */
+    public Promotion promote(String appId, String fromEnvironment, String username) {
+
+        // check if the app can be deployed
+        if (appId == null) {
+            throw new InvalidDeployException("No app given");
+        }
+        App app = apps.getApp(appId);
+        if (app.deploy() == null) {
+            throw AppNotFoundException.noDeploy(appId);
+        }
+
+        // check if the environment exists and has a next one
+        if (!environments.contains(fromEnvironment)) {
+            throw new InvalidDeployException("Environments are " + String.join(", ", environments.environments())
+                    + ", got: " + fromEnvironment);
+        }
+        String toEnvironment = environments.nextEnvironment(fromEnvironment)
+                .orElseThrow(() -> new InvalidDeployException(fromEnvironment + " is the last environment"));
+
+        // read the versions running in the source and the next environment
+        String version;
+        String toVersion;
+        try {
+            version = findRunningVersion(appId, fromEnvironment);
+            toVersion = findRunningVersion(appId, toEnvironment);
+        } catch (OperateToolException e) {
+            audit.add(username, AuditEntry.ActionType.PROMOTE, appId, AuditEntry.ActionResult.FAILED, null,
+                    "from " + fromEnvironment + " to " + toEnvironment + ": couldn't read the running versions: "
+                            + e.getMessage(), toEnvironment, null);
+            throw e;
+        }
+
+        // check there's a version to promote and the next environment doesn't run it or a higher one
+        if (version == null) {
+            throw new InvalidDeployException(appId + " has no version running in " + fromEnvironment);
+        }
+        if (version.equals(toVersion)) {
+            throw new InvalidDeployException(toEnvironment + " already runs " + appId + " " + version);
+        }
+        if (DockerRegistryReleaseService.isHigherVersion(toVersion, version)) {
+            throw new InvalidDeployException(toEnvironment + " runs " + appId + " " + toVersion + ", higher than "
+                    + version + " in " + fromEnvironment);
+        }
+
+        // check if the version is released
+        String auditMessage = version + " from " + fromEnvironment + " to " + toEnvironment;
+        try {
+            if (!releases.hasVersion(appId, version)) {
+                throw new InvalidDeployException(appId + " has no released version " + version);
+            }
+        } catch (ReleaseToolException e) {
+            audit.add(username, AuditEntry.ActionType.PROMOTE, appId, AuditEntry.ActionResult.FAILED, null,
+                    auditMessage + ": couldn't check the version: " + e.getMessage(), toEnvironment, version);
+            throw e;
+        }
+
+        // start the deploy job and record it
+        try {
+            Optional<String> buildId = jenkins.triggerBuild(app.deploy().job(),
+                    Map.of(VERSION, version, ENVIRONMENT, toEnvironment));
+            String details = buildId.isPresent()
+                    ? auditMessage
+                    : auditMessage + "; queued, but the CI tool hadn't started it yet";
+            audit.add(username, AuditEntry.ActionType.PROMOTE, appId, AuditEntry.ActionResult.SUCCESS,
+                    buildId.orElse(null), details, toEnvironment, version);
+            return new Promotion(appId, version, fromEnvironment, toEnvironment, buildId.orElse(null));
+        } catch (CiToolException e) {
+            audit.add(username, AuditEntry.ActionType.PROMOTE, appId, AuditEntry.ActionResult.FAILED, null,
+                    auditMessage + ": " + e.getMessage(), toEnvironment, version);
+            throw e;
+        }
+    }
+
+    /**
+     * The version of an app running in an environment.
+     *
+     * @return the version, or null when the app doesn't run there or its version can't be told
+     * @throws OperateToolException when Kubernetes can't be reached
+     */
+    private String findRunningVersion(String appId, String environment) {
+        return kubernetes.listWorkloads(environment).stream()
+                .filter(workload -> workload.name().equals(appId))
+                .map(OperateWorkload::version)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 }

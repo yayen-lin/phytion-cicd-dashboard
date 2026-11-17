@@ -3,7 +3,7 @@ import {useNavigate, useParams} from 'react-router'
 import {ArrowUpRight, MoreHorizontal, RefreshCw, Rocket, Server, Undo2} from 'lucide-react'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,15 +12,17 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {Skeleton} from '@/components/ui/skeleton'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {getEnvironments, type EnvironmentStatus} from '@/api/deploy'
+import {getEnvironments, type EnvironmentApp, type EnvironmentStatus} from '@/api/deploy'
 import CommitLink from '@/features/code/CommitLink'
 import DeployDialog from '@/features/deploy/DeployDialog'
+import PromoteDialog from '@/features/deploy/PromoteDialog'
 import HealthBadge from './HealthBadge'
 import {deployedLabel} from '@/features/deploy/deployedLabel'
 
 /**
  * One environment's page (/environments/staging), from one request: one row per app running there with its version,
- * health, and who deployed it and when. A row's menu deploys another version; clicking a row opens the app's page.
+ * health, and who deployed it and when. A row's menu deploys another version or promotes the running one to the next
+ * environment; clicking a row opens the app's page.
  */
 function EnvironmentPage() {
   const {environment = ''} = useParams()
@@ -31,6 +33,8 @@ function EnvironmentPage() {
   const [refreshing, setRefreshing] = useState(false)
   // the app whose Deploy dialog is open, or null when it is closed
   const [deployingAppId, setDeployingAppId] = useState<string | null>(null)
+  // the app whose Promote dialog is open, or null when it is closed
+  const [promotingApp, setPromotingApp] = useState<EnvironmentApp | null>(null)
 
   const loadEnvironment = useCallback(() => {
     return getEnvironments({environment})
@@ -74,13 +78,11 @@ function EnvironmentPage() {
     <div className="space-y-6">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Server className="size-6"/>{environment}</h1>
-        <p className="text-sm text-muted-foreground">The apps running in {environment}: version, health, and who deployed them and when</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Apps</CardTitle>
-          <CardDescription>Click an app to see its commits, builds, versions and environments</CardDescription>
           <CardAction>
             <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
               <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
@@ -142,11 +144,13 @@ function EnvironmentPage() {
                           <DropdownMenuItem onSelect={() => setDeployingAppId(app.appId)}>
                             <Rocket/> Deploy a version
                           </DropdownMenuItem>
-                          {/* promote and rollback come in steps 2.5 and 2.6 */}
-                          <DropdownMenuItem disabled>
-                            <ArrowUpRight/> Promote
-                            <span className="ml-auto text-xs text-muted-foreground">soon</span>
-                          </DropdownMenuItem>
+                          {/* no promote from the last environment, or of a version that can't be told */}
+                          {status?.nextEnvironment && (
+                            <DropdownMenuItem disabled={!app.version} onSelect={() => setPromotingApp(app)}>
+                              <ArrowUpRight/> Promote
+                            </DropdownMenuItem>
+                          )}
+                          {/* rollback comes in step 2.6 */}
                           <DropdownMenuItem disabled>
                             <Undo2/> Rollback
                             <span className="ml-auto text-xs text-muted-foreground">soon</span>
@@ -166,6 +170,12 @@ function EnvironmentPage() {
         <DeployDialog appId={deployingAppId} pickedEnvironment={environment}
                       environments={[{name: environment, needsConfirmation: status.needsConfirmation}]}
                       open onOpenChange={(open) => !open && setDeployingAppId(null)} onDeployed={loadEnvironment}/>
+      )}
+
+      {promotingApp?.version && status?.nextEnvironment && (
+        <PromoteDialog appId={promotingApp.appId}
+                       choices={[{version: promotingApp.version, fromEnvironment: environment, toEnvironment: status.nextEnvironment}]}
+                       open onOpenChange={(open) => !open && setPromotingApp(null)} onPromoted={loadEnvironment}/>
       )}
     </div>
   )

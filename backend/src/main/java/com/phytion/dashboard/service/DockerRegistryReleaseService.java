@@ -228,6 +228,15 @@ public class DockerRegistryReleaseService {
     }
 
     /**
+     * Whether a version is higher than another or false when either isn't in the format.
+     */
+    public static boolean isHigherVersion(String version, String otherVersion) {
+        VersionNumber number = version == null ? null : parseVersionString(version);
+        VersionNumber otherNumber = otherVersion == null ? null : parseVersionString(otherVersion);
+        return number != null && otherNumber != null && VersionNumber.HIGHEST_FIRST.compare(number, otherNumber) < 0;
+    }
+
+    /**
      * Parse a string version to numbers (e.g., "1.10.0" -> 1, 10, 0); null for a tag in another format
      */
     private static VersionNumber parseVersionString(String tag) {

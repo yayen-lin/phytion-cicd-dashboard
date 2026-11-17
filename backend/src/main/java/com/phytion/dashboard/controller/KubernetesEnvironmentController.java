@@ -26,7 +26,12 @@ public class KubernetesEnvironmentController {
             @RequestParam(required = false) String appId) {
         return new EnvironmentsResponse(environmentService.listEnvironments(environment, appId).stream()
                 .map(status -> new EnvironmentStatusResponse(status.environment(),
-                        environmentsProperties.needsConfirmation(status.environment()), status.apps()))
+                        environmentsProperties.needsConfirmation(status.environment()),
+                        environmentsProperties.nextEnvironment(status.environment())
+                                .map(next -> new EnvironmentController.EnvironmentResponse(next,
+                                        environmentsProperties.needsConfirmation(next)))
+                                .orElse(null),
+                        status.apps()))
                 .toList());
     }
 
@@ -34,6 +39,7 @@ public class KubernetesEnvironmentController {
     }
 
     public record EnvironmentStatusResponse(String environment, boolean needsConfirmation,
+                                            EnvironmentController.EnvironmentResponse nextEnvironment,
                                             List<EnvironmentApp> apps) {
     }
 }

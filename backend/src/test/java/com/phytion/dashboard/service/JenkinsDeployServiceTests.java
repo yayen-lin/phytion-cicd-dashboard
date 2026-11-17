@@ -14,6 +14,8 @@ import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.ci.jenkins.JenkinsAdapter;
+import com.phytion.dashboard.adapter.operate.OperateToolException;
+import com.phytion.dashboard.adapter.operate.kubernetes.KubernetesAdapter;
 import com.phytion.dashboard.adapter.release.ReleaseToolException;
 import com.phytion.dashboard.config.AppsProperties;
 import com.phytion.dashboard.config.EnvironmentsProperties;
@@ -26,6 +28,8 @@ import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.CodeRepo;
 import com.phytion.dashboard.model.DeployJob;
 import com.phytion.dashboard.model.DeployRun;
+import com.phytion.dashboard.model.OperateWorkload;
+import com.phytion.dashboard.model.Promotion;
 import com.phytion.dashboard.model.ReleaseImage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +51,7 @@ class JenkinsDeployServiceTests {
     private static final Map<String, String> STAGING_1_0_1 = Map.of("VERSION", "1.0.1", "ENVIRONMENT", "staging");
 
     private JenkinsAdapter jenkins;
+    private KubernetesAdapter kubernetes;
     private DockerRegistryReleaseService releases;
     private AuditService audit;
     private JenkinsDeployService deployService;
@@ -54,10 +59,11 @@ class JenkinsDeployServiceTests {
     @BeforeEach
     void setUp() {
         jenkins = mock(JenkinsAdapter.class);
+        kubernetes = mock(KubernetesAdapter.class);
         releases = mock(DockerRegistryReleaseService.class);
         audit = mock(AuditService.class);
         when(releases.hasVersion(APP, "1.0.1")).thenReturn(true);
-        deployService = new JenkinsDeployService(jenkins, releases, audit, new AppService(APPS),
+        deployService = new JenkinsDeployService(jenkins, kubernetes, releases, audit, new AppService(APPS),
                 new EnvironmentsProperties(List.of("dev", "staging", "prod"), List.of("prod")));
     }
 
@@ -81,6 +87,20 @@ class JenkinsDeployServiceTests {
         assertThat(deployService.listDeploys(APP)).containsExactly(
                 new DeployRun(APP, "1.0.1", "staging", build9, "andy"),
                 new DeployRun(APP, "1.0.0", "dev", build8, "admin"));
+    }
+
+    @Test
+    void listDeploysNamesTheDashboardUserWhoPromoted() {
+        CiBuild build10 = deployBuild("10");
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                new CiParameterizedBuild(build10, STAGING_1_0_1, "dashboard-bot")));
+        when(audit.getRecentEntries(new AuditFilter(APP, AuditEntry.ActionType.PROMOTE, null,
+                AuditEntry.ActionResult.SUCCESS, null, null, null))).thenReturn(List.of(
+                new AuditEntry("sam", AuditEntry.ActionType.PROMOTE, APP, Instant.now(),
+                        AuditEntry.ActionResult.SUCCESS, "10", "1.0.1 from dev to staging", "staging", "1.0.1")));
+
+        assertThat(deployService.listDeploys(APP)).containsExactly(
+                new DeployRun(APP, "1.0.1", "staging", build10, "sam"));
     }
 
     @Test
@@ -187,5 +207,146 @@ class JenkinsDeployServiceTests {
                 .isInstanceOf(AppNotFoundException.class)
                 .hasMessage("App undeployed-app has no deploy configured");
         verifyNoInteractions(jenkins, releases, audit);
+    }
+
+    @Test
+    void promoteDeploysTheVersionRunningInTheSourceToTheNextEnvironmentAndRecordsIt() {
+        when(kubernetes.listWorkloads("dev")).thenReturn(List.of(
+                new OperateWorkload("other-app", "2.0.0", 1, 1),
+                // not ready: whoever promotes decides
+                new OperateWorkload(APP, "1.0.1", 1, 0)));
+        when(jenkins.triggerBuild(DEPLOY_JOB, STAGING_1_0_1)).thenReturn(Optional.of("4"));
+
+        assertThat(deployService.promote(APP, "dev", "andy"))
+                .isEqualTo(new Promotion(APP, "1.0.1", "dev", "staging", "4"));
+
+        verify(audit).add("andy", AuditEntry.ActionType.PROMOTE, APP, AuditEntry.ActionResult.SUCCESS, "4",
+                "1.0.1 from dev to staging", "staging", "1.0.1");
+    }
+
+    @Test
+    void promoteOverALowerVersionInTheNextEnvironmentDeploysIt() {
+        when(kubernetes.listWorkloads("dev")).thenReturn(List.of(new OperateWorkload(APP, "1.0.1", 1, 1)));
+        when(kubernetes.listWorkloads("staging")).thenReturn(List.of(new OperateWorkload(APP, "1.0.0", 1, 1)));
+        when(jenkins.triggerBuild(DEPLOY_JOB, STAGING_1_0_1)).thenReturn(Optional.of("4"));
+
+        assertThat(deployService.promote(APP, "dev", "andy"))
+                .isEqualTo(new Promotion(APP, "1.0.1", "dev", "staging", "4"));
+    }
+
+    @Test
+    void promoteWhenTheNextEnvironmentRunsTheSameOrAHigherVersionIsRejected() {
+        when(kubernetes.listWorkloads("dev")).thenReturn(List.of(new OperateWorkload(APP, "1.0.1", 1, 1)));
+
+        // same version
+        when(kubernetes.listWorkloads("staging")).thenReturn(List.of(new OperateWorkload(APP, "1.0.1", 1, 1)));
+        assertThatThrownBy(() -> deployService.promote(APP, "dev", "andy"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("staging already runs sample-app 1.0.1");
+
+        // higher version, compared by number, not as text
+        when(kubernetes.listWorkloads("staging")).thenReturn(List.of(new OperateWorkload(APP, "1.0.10", 1, 1)));
+        assertThatThrownBy(() -> deployService.promote(APP, "dev", "andy"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("staging runs sample-app 1.0.10, higher than 1.0.1 in dev");
+
+        verifyNoInteractions(jenkins, releases, audit);
+    }
+
+    @Test
+    void promoteOfAVersionNotInTheRegistryIsRejected() {
+        when(kubernetes.listWorkloads("dev")).thenReturn(List.of(new OperateWorkload(APP, "9.9.9", 1, 1)));
+
+        assertThatThrownBy(() -> deployService.promote(APP, "dev", "andy"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("sample-app has no released version 9.9.9");
+        verifyNoInteractions(jenkins, audit);
+    }
+
+    @Test
+    void promoteWhenTheRegistryCanNotBeReachedIsRecordedAndNoJobStarts() {
+        when(kubernetes.listWorkloads("dev")).thenReturn(List.of(new OperateWorkload(APP, "1.0.1", 1, 1)));
+        when(releases.hasVersion(APP, "1.0.1")).thenThrow(new ReleaseToolException("Registry not reachable"));
+
+        assertThatThrownBy(() -> deployService.promote(APP, "dev", "andy"))
+                .isInstanceOf(ReleaseToolException.class);
+
+        verify(audit).add("andy", AuditEntry.ActionType.PROMOTE, APP, AuditEntry.ActionResult.FAILED, null,
+                "1.0.1 from dev to staging: couldn't check the version: Registry not reachable", "staging", "1.0.1");
+        verifyNoInteractions(jenkins);
+    }
+
+    @Test
+    void promoteWhoseBuildIsStillQueuedIsRecordedWithoutBuildId() {
+        when(kubernetes.listWorkloads("dev")).thenReturn(List.of(new OperateWorkload(APP, "1.0.1", 1, 1)));
+        when(jenkins.triggerBuild(DEPLOY_JOB, STAGING_1_0_1)).thenReturn(Optional.empty());
+
+        assertThat(deployService.promote(APP, "dev", "andy"))
+                .isEqualTo(new Promotion(APP, "1.0.1", "dev", "staging", null));
+
+        verify(audit).add("andy", AuditEntry.ActionType.PROMOTE, APP, AuditEntry.ActionResult.SUCCESS, null,
+                "1.0.1 from dev to staging; queued, but the CI tool hadn't started it yet", "staging", "1.0.1");
+    }
+
+    @Test
+    void promoteWhoseDeployJobDoesNotStartIsRecordedWithTheReason() {
+        when(kubernetes.listWorkloads("dev")).thenReturn(List.of(new OperateWorkload(APP, "1.0.1", 1, 1)));
+        when(jenkins.triggerBuild(DEPLOY_JOB, STAGING_1_0_1)).thenThrow(new CiToolException("Jenkins not reachable"));
+
+        assertThatThrownBy(() -> deployService.promote(APP, "dev", "andy"))
+                .isInstanceOf(CiToolException.class);
+
+        verify(audit).add("andy", AuditEntry.ActionType.PROMOTE, APP, AuditEntry.ActionResult.FAILED, null,
+                "1.0.1 from dev to staging: Jenkins not reachable", "staging", "1.0.1");
+    }
+
+    @Test
+    void promoteWhenKubernetesCanNotBeReachedIsRecordedAndNoJobStarts() {
+        when(kubernetes.listWorkloads("dev")).thenThrow(new OperateToolException("Kubernetes not reachable"));
+
+        assertThatThrownBy(() -> deployService.promote(APP, "dev", "andy"))
+                .isInstanceOf(OperateToolException.class);
+
+        verify(audit).add("andy", AuditEntry.ActionType.PROMOTE, APP, AuditEntry.ActionResult.FAILED, null,
+                "from dev to staging: couldn't read the running versions: Kubernetes not reachable", "staging", null);
+        verifyNoInteractions(jenkins);
+    }
+
+    @Test
+    void promoteWithNothingRunningInTheSourceIsRejected() {
+        when(kubernetes.listWorkloads("dev")).thenReturn(List.of(
+                new OperateWorkload("other-app", "2.0.0", 1, 1),
+                // running, but its version can't be told
+                new OperateWorkload(APP, null, 1, 1)));
+
+        assertThatThrownBy(() -> deployService.promote(APP, "dev", "andy"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("sample-app has no version running in dev");
+        verifyNoInteractions(jenkins, audit);
+    }
+
+    @Test
+    void promoteFromTheLastOrAnUnknownEnvironmentIsRejectedBeforeAnythingHappens() {
+        assertThatThrownBy(() -> deployService.promote(APP, "prod", "andy"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("prod is the last environment");
+        assertThatThrownBy(() -> deployService.promote(APP, "test", "andy"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("Environments are dev, staging, prod, got: test");
+        assertThatThrownBy(() -> deployService.promote(APP, null, "andy"))
+                .isInstanceOf(InvalidDeployException.class);
+        verifyNoInteractions(jenkins, kubernetes, audit);
+    }
+
+    @Test
+    void promoteOfAnUnknownMissingOrUndeployedAppIsRejected() {
+        assertThatThrownBy(() -> deployService.promote("other-app", "dev", "andy"))
+                .isInstanceOf(AppNotFoundException.class);
+        assertThatThrownBy(() -> deployService.promote(null, "dev", "andy"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("No app given");
+        assertThatThrownBy(() -> deployService.promote("undeployed-app", "dev", "andy"))
+                .isInstanceOf(AppNotFoundException.class);
+        verifyNoInteractions(jenkins, kubernetes, audit);
     }
 }

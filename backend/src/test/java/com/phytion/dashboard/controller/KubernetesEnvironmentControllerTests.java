@@ -42,15 +42,17 @@ class KubernetesEnvironmentControllerTests {
     @Test
     @WithMockUser
     void environmentsPassTheFiltersAndReturnEachAppsState() throws Exception {
-        when(environmentService.listEnvironments("staging", null)).thenReturn(List.of(new EnvironmentStatus("staging",
+        when(environmentService.listEnvironments("dev", null)).thenReturn(List.of(new EnvironmentStatus("dev",
                 List.of(new EnvironmentApp("sample-app", "1.0.1", "a4dad00", null, 1, 1, true,
                                 Instant.parse("2026-11-13T18:31:00Z"), "andy", "3"),
                         EnvironmentApp.notDeployed("dummy-app")), List.of())));
 
-        mvc.perform(get("/api/deploy/environments").param("environment", "staging"))
+        mvc.perform(get("/api/deploy/environments").param("environment", "dev"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.environments[0].environment").value("staging"))
+                .andExpect(jsonPath("$.environments[0].environment").value("dev"))
                 .andExpect(jsonPath("$.environments[0].needsConfirmation").value(false))
+                .andExpect(jsonPath("$.environments[0].nextEnvironment.name").value("staging"))
+                .andExpect(jsonPath("$.environments[0].nextEnvironment.needsConfirmation").value(true))
                 .andExpect(jsonPath("$.environments[0].apps[0].version").value("1.0.1"))
                 .andExpect(jsonPath("$.environments[0].apps[0].healthy").value(true))
                 .andExpect(jsonPath("$.environments[0].apps[0].deployedBy").value("andy"))
@@ -78,7 +80,8 @@ class KubernetesEnvironmentControllerTests {
 
         mvc.perform(get("/api/deploy/environments").param("environment", "prod"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.environments[0].needsConfirmation").value(true));
+                .andExpect(jsonPath("$.environments[0].needsConfirmation").value(true))
+                .andExpect(jsonPath("$.environments[0].nextEnvironment").isEmpty());
     }
 
     @Test

@@ -198,102 +198,50 @@ Decisions:
       values file per environment for what differs (dev and staging: 1 replica, 512Mi; prod: 2
       replicas, 1Gi). The version is given at deploy time (`--set image.tag=1.0.1`). Checked by
       installing `sample-app:1.0.1` into `dev` from the local registry: its pod became ready
-- [ ] 2.3 Deploy: a Jenkins deploy job (parameters: version, environment) that runs
-      `helm upgrade --install` with the app's `deploy/` chart and that image version; Jenkins gets
-      `helm` and access to the cluster. Dashboard: "Deploy" button (pick a version and an
-      environment) that triggers the job and records `DEPLOY` in the audit log
-  - [x] 1. Helm in the Jenkins image (`jenkins/Dockerfile`), rebuild the container, check
-           `helm version` inside it
-  - [x] 2. Cluster access for Jenkins: a service account `jenkins-deployer` allowed to deploy only
-           in `dev`, `staging` and `prod`; a kubeconfig with its token that reaches the cluster from
-           inside the container (`host.docker.internal:6443`, not `127.0.0.1`), stored as a Jenkins
-           credential. Check with `helm list -n dev` from a test job
-  - [x] 3. Deploy pipeline: `Jenkinsfile.deploy` in each app (parameters `VERSION`, `ENVIRONMENT`):
-           checks out the tag `v<VERSION>` so the chart matches the version, then
-           `helm upgrade --install <app> ./deploy -n <env> -f deploy/values-<env>.yaml
-           --set image.tag=<VERSION> --wait`, so the job fails when the pods don't get ready.
-           Jenkins jobs `sample-app-deploy` and `dummy-app-deploy`. Check by running one from
-           Jenkins' UI (e.g. `sample-app` 1.0.1 to `staging`). 
-  - [x] 4. Backend: each app's deploy job in `application.properties` (`deploy.tool`,
-           `deploy.job`) and the environments list; a deploy service that checks the version is
-           in the registry and the environment exists, triggers the job with the Jenkins adapter,
-           and records `DEPLOY` (also when it fails, with the reason); a POST endpoint; tests
-  - [x] 5. Environment-first layout, before any new frontend: pages per environment and per app
-           instead of per stage, reusing today's tables and dialogs. Sidebar: Overview, `dev`,
-           `staging`, `prod`, Apps, History
-    - Overview: one card per environment (how many apps, how many healthy, latest deploy)
-    - Environment page (`/environments/<env>`): one row per app running there (version, health,
-      deployed when and by whom); a row's actions dropdown: Deploy a version, Promote to the next
-      environment, Rollback. Clicking a row opens the app page
-    - Apps page (`/apps`): one row per app (latest build, latest version, what runs in each
-      environment); a row's actions dropdown: Run build (build + test), Release, Deploy (pick an
-      environment and a version; also how an app gets into an environment the first time).
-      Clicking a row opens the app page
-    - App page (`/apps/<app>`): tabs for Commits, Builds (with tests), Versions and Environments.
-      Clicking a commit row tags it, which is the release: the same dialog as the Release action
-    - Tagging a commit is releasing (`v1.0.2` makes Jenkins build image `1.0.2`); deploying is
-      picking which version (tag) goes into an environment
-    - Old stage pages are removed in the item that replaces them, not at the end
-    - [x] 5.1 Routes and sidebar: routes `/`, `/environments/:env`, `/apps`, `/apps/:app/:tab`,
-          `/history` with empty pages; sidebar Overview, the environments (from `GET /api/environments`,
-          read from the config only), Apps, History. Home page removed: `/` is the Overview
-    - [x] 5.2 App page: tabs Branches, Commits (any branch), Builds (with tests), Versions,
-          Environments, reusing today's tables
-    - [x] 5.3 Release from a commit: clicking a commit row (on any branch) opens the Release dialog;
-          the dialog warns when the commit isn't on main. Then remove the
-          Code, Build & Test and Release pages
-    - [x] 5.4 Apps page and Deploy dialog
-      - Backend: `GET /api/apps/summary`, one row per app (latest build with its test counts,
-        latest version, version and health in each environment). A tool that can't be reached
-        leaves its part empty and marked unavailable instead of failing the whole response
-      - Backend: `GET /api/deploy/deployments/{buildId}?appId=`, a deploy build's status and
-        Jenkins link (deploys run in the app's deploy job, which the build endpoints don't read)
-      - Apps page: one row per app from the summary; actions Run build, Release, Deploy; clicking
-        a row opens the app page
-      - Deploy dialog: pick a version from the registry and an environment; then shows the started
-        deploy build with a link to Jenkins. Environments in `dashboard.confirm-environments`
-        (`prod`) ask to type the environment's name before deploying
-    - [x] 5.5 Environment page: one row per app (version, health, deployed when and by whom);
-          actions Deploy (the same dialog, environment already picked), Promote and Rollback
-          (shown as "soon" until 2.5 and 2.6); clicking a row opens the app page
-    - [x] 5.6 Overview (`GET /api/overview`): one fixed-height card per environment (any number of them) with its status from Kubernetes (Healthy, Failing, Nothing running), deploys still running, and a scrollable list of the apps running there (failing first; version, who deployed it and when). Deploys are read from each app's Jenkins deploy job, so ones started in Jenkins show too; a failed deploy that left the old version running isn't shown as failing
-    - [x] 5.7 One request per view: each view below combines several requests today; give each one
-          backend endpoint that returns all it shows (selectors included)
-      - [x] 1. History page: the audit log with each entry's build in one response
-               (`GET /api/history`); a deploy's build is looked up in the deploy job (it was wrongly
-               looked up in the pipeline) and links to Jenkins
-      - [x] 2. Build details dialog: the build and its test report in one response
-               (`GET /api/ci/builds/{id}`, both read from Jenkins at the same time; the `/tests`
-               endpoint is gone)
-      - [x] 3. Commits table: the branches and the chosen branch's commits (default main) in one
-               response (`GET /api/code/commits?appId=&branch=`, branch optional; the backend picks
-               the branch and reads its commits while reading the branches); switching branches is
-               one request
-      - [x] 4. Release dialog: the same endpoint as the Commits table for its branch and commit
-               pickers
-      - [x] 5. App page header: `GET /api/apps/{id}` instead of loading every app to find one
-    - [x] 5.8 Final check: no unused pages, components or API functions left; every route and
-          sidebar link works
-      - [x] Code check: no unused frontend pages, components, API functions or helpers; every link
-            points at a route; no unused backend service or adapter methods. `GET /api/apps` and
-            `GET /api/audit` are no longer called by the frontend: marked UNUSED, kept for review
-      - [x] In the browser: open every route and sidebar link with the backend running
-  - [x] 6. Folded into 5.4 (Deploy dialog)
-  - [x] 7. Check end to end: deploy from the dashboard, see the pods in `kubectl get pods -n <env>`
-           and the `DEPLOY` entry on the History page
-  - [x] 8. Small changes:
-      - Release dialog fills in the version: the repo's highest `vX.Y.Z` tag with the last number
-        bumped (`v0.0.1` for the first release), from `GET /api/release/draft`, which also returns
-        the branches and commits (one request)
-      - Toasts at the top right
-      - Sidebar: Overview, Apps; Environments; Management (History, Users disabled until the Users
-        page exists)
-      - Ready / desired pods shown on the Overview rows and the Apps page's environment cells
-- [x] 2.4 Environment overview (Deploy page): read-only Kubernetes adapter; a grid of apps x
-      environments showing the running version, its commit, whether it's healthy (ready pods),
-      and when and by whom it was deployed (from the audit log)
-- [ ] 2.5 Promotion: "Promote" moves the exact version running in dev to staging, or staging to
+- [x] 2.3 Deploy: a Jenkins deploy job per app (`Jenkinsfile.deploy`, parameters `VERSION` and
+      `ENVIRONMENT`) runs `helm upgrade --install --wait` through the `jenkins-deployer` account; the
+      dashboard triggers it and records `DEPLOY`.
+- [x] 2.4 Environment overview: a read-only Kubernetes adapter shows each environment's running
+      version, commit and health, and who deployed it and when
+- [x] 2.5 Promotion: "Promote" moves the exact version running in dev to staging, or staging to
       prod. Prod asks "are you sure?" (type the environment name to confirm). Recorded as `PROMOTE`
+  - [x] 1. Backend: `PROMOTE` in `AuditEntry.ActionType`; `listDeploys` also reads `PROMOTE` entries
+           for who started a deploy build (today only `DEPLOY`, so a promote shows Jenkins' user)
+  - [x] 2. Backend: a promote method next to `deploy` (app, source environment): the next environment
+           is the next one in `dashboard.environments`; the version is the one Kubernetes says runs in
+           the source environment (no health check: whoever promotes decides). Fails when nothing runs
+           there, there's no next environment, the next environment already runs the same or a higher
+           version (going back is Rollback's job, or a plain Deploy), or the version isn't in the
+           registry. Triggers the deploy job with that version and records `PROMOTE`, also when it
+           fails, with the reason (a bad request, e.g. nothing to promote, gets a 400 and isn't
+           recorded, like Deploy); a POST endpoint; tests
+  - [x] 3. Frontend: Promote dialog ("sample-app 1.0.1: staging → prod"); environments in
+           `dashboard.confirm-environments` ask to type the target environment's name; then shows the
+           started deploy build with a link to Jenkins, like the Deploy dialog
+  - [x] 4. Environment page: turn on the Promote action; hidden in the last environment
+  - [x] 5. Check end to end: promote dev → staging → prod, see the pods in
+           `kubectl get pods -n <env>` and the `PROMOTE` entries on the History page
 - [ ] 2.6 Rollback: go back to the version that ran before in that environment, with
       `helm rollback` (Helm keeps each install's history) run by a Jenkins job. Confirmation for
       prod; recorded as `ROLLBACK`
+  - [ ] 1. Rollback pipeline: `Jenkinsfile.rollback` in each app (parameter `ENVIRONMENT`), a job
+           separate from the deploy job. It rolls back to the last revision that ran (`superseded` in
+           `helm history`, not a failed one) with `helm rollback <app> <revision> -n <env> --wait`, so
+           the job fails when the pods don't get ready. Jenkins jobs `sample-app-rollback` and
+           `dummy-app-rollback`. Check by running one from Jenkins' UI
+  - [ ] 2. Backend: each app's rollback job in `application.properties` (`deploy.rollback-job`);
+           `ROLLBACK` in `AuditEntry.ActionType`
+  - [ ] 3. Backend: a GET endpoint for the version a rollback goes back to (from the deploy job's
+           history: the last successful deploy to that environment before the current one), so the
+           dialog shows "1.0.2 → 1.0.1" before confirming
+  - [ ] 4. Backend: a rollback method (app, environment): triggers the rollback job and records
+           `ROLLBACK` with the from and to versions, also when it fails, with the reason; a POST
+           endpoint; tests
+  - [ ] 5. Backend: read the rollback job's builds next to the deploy job's, so the Environment page
+           and Overview show who rolled back and when (also rollbacks started in Jenkins)
+  - [ ] 6. Frontend: Rollback dialog with the from and to versions; the same type-to-confirm for
+           `dashboard.confirm-environments`. Environment page: turn on the Rollback action, disabled
+           when there's nothing to roll back to
+  - [ ] 7. Check end to end: deploy 1.0.1 then 1.0.2 to staging, roll back, see 1.0.1 running and
+           the `ROLLBACK` entry on the History page
+- [] 2.7 user management

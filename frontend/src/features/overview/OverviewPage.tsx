@@ -116,7 +116,6 @@ function OverviewPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
-          <p className="text-sm text-muted-foreground">Each environment at a glance: its status and the apps running there</p>
         </div>
         <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
           <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>

@@ -24,7 +24,8 @@ public class AuditEntry {
     public enum ActionType {
         BUILD,
         RELEASE,
-        DEPLOY
+        DEPLOY,
+        PROMOTE
     }
 
     public enum ActionResult {
