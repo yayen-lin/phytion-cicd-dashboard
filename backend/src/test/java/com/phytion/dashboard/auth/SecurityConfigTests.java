@@ -29,6 +29,14 @@ class SecurityConfigTests {
     }
 
     @Test
+    void statusGivesThePollIntervalFromTheConfig() throws Exception {
+        mvc.perform(get("/api/status"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.pollIntervalMillis").value(3000));
+    }
+
+    @Test
     void meNeedsLogin() throws Exception {
         mvc.perform(get("/api/me")).andExpect(status().isUnauthorized());
     }

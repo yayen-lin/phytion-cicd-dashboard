@@ -9,6 +9,7 @@ import {Skeleton} from '@/components/ui/skeleton'
 import {getHistory, type AuditActionResult, type AuditEntry, type History} from '@/api/history'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import {formatActionType} from '@/lib/format'
+import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
 import AuditTable from './AuditTable'
 
 // The Select can't have an empty value, so "all" stands for "no filter"
@@ -42,7 +43,8 @@ function FilterSelect({label, value, options, onChange}: FilterSelectProps) {
 }
 
 /**
- * Every action taken through the dashboard, on any app: who did what, to what, and when.
+ * Every action taken through the dashboard, on any app: who did what, to what, and when; updates itself while one of
+ * their builds runs.
  * The filters are in the query (?target=sample-app&username=andy...), so a filtered view has its own link.
  */
 function HistoryPage() {
@@ -73,7 +75,10 @@ function HistoryPage() {
     loadHistory()
   }, [loadHistory])
 
-  // Keeps the current rows on screen while reloading
+  // load again while a build runs
+  usePollWhileRunning(history, !!history?.entries.some((item) => item.build?.status === 'RUNNING'), loadHistory)
+
+  // keeps the current rows on screen while reloading
   async function handleRefresh() {
     setRefreshing(true)
     await loadHistory()

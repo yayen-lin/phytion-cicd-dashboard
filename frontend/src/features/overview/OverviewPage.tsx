@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useState} from 'react'
 import {Link} from 'react-router'
-import {Loader2, RefreshCw, Server} from 'lucide-react'
+import {ExternalLink, Loader2, RefreshCw, Server} from 'lucide-react'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Badge} from '@/components/ui/badge'
 import {Button} from '@/components/ui/button'
@@ -10,6 +10,7 @@ import type {EnvironmentApp} from '@/api/deploy'
 import {getOverview, type EnvironmentOverview} from '@/api/overview'
 import {deployedLabel} from '@/features/deploy/deployedLabel'
 import {cn} from '@/lib/utils'
+import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
 
 /**
  * The environment's status from its running apps: Failing when any app has pods not ready.
@@ -61,6 +62,7 @@ function EnvironmentCard({overview}: { overview: EnvironmentOverview }) {
              className="flex items-center gap-2 text-sm text-sky-700 hover:underline dark:text-sky-300">
             <Loader2 className="size-3.5 shrink-0 animate-spin"/>
             <span className="truncate">Deploying {deploy.appId} {deploy.version}{deploy.startedBy ? ` by ${deploy.startedBy}` : ''}</span>
+            <ExternalLink className="size-3.5 shrink-0"/>
           </a>
         ))}
       </CardHeader>
@@ -83,7 +85,7 @@ function EnvironmentCard({overview}: { overview: EnvironmentOverview }) {
 
 /**
  * The landing page after login: one card per environment, from one request, each with its status (healthy or
- * failing, from Kubernetes), deploys still running, and the apps running there.
+ * failing, from Kubernetes), deploys still running, and the apps running there; updates itself while a deploy runs.
  */
 function OverviewPage() {
   // null while loading
@@ -103,6 +105,9 @@ function OverviewPage() {
   useEffect(() => {
     loadOverview()
   }, [loadOverview])
+
+  // load again while a deploy runs
+  usePollWhileRunning(overviews, !!overviews?.some((o) => o.runningDeploys.length > 0), loadOverview)
 
   // keeps the current cards on screen while reloading
   async function handleRefresh() {

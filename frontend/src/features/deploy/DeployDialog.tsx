@@ -1,5 +1,5 @@
-import {useCallback, useEffect, useState, type FormEvent} from 'react'
-import {ExternalLink, Loader2, RefreshCw, Rocket} from 'lucide-react'
+import {useCallback, useEffect, useRef, useState, type FormEvent} from 'react'
+import {ExternalLink, Loader2, Rocket} from 'lucide-react'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Button} from '@/components/ui/button'
 import {
@@ -18,6 +18,7 @@ import type {CiBuild} from '@/api/ci'
 import {deploy, getDeployBuild} from '@/api/deploy'
 import type {Environment} from '@/api/environments'
 import {getVersions, type ReleaseVersion} from '@/api/release'
+import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
 import StatusBadge from '@/features/build/StatusBadge'
 
 type Props = {
@@ -29,7 +30,7 @@ type Props = {
   pickedEnvironment?: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** After the deploy job was started, e.g. to reload what runs where */
+  /** After the deploy job was started, and again when its build finished, e.g. to reload what runs where */
   onDeployed?: () => void
 }
 
@@ -168,17 +169,23 @@ function DeployForm({appId, environments, pickedEnvironment, onStarted}: Pick<Pr
   )
 }
 
-/** The started deploy's build: its status, a refresh button, and a link to it in the CI tool. */
-export function StartedDeployView({appId, started}: { appId: string, started: StartedDeploy }) {
+/**
+ * The started deploy's build: its status, read again every few seconds while it runs, and a link to it in the CI tool.
+ * Calls onFinished once when the build is no longer running, e.g. to reload the table behind the dialog.
+ */
+export function StartedDeployView({appId, started, onFinished}: {
+  appId: string
+  started: StartedDeploy
+  onFinished?: () => void
+}) {
   // null while loading
   const [build, setBuild] = useState<CiBuild | null>(null)
   const [error, setError] = useState('')
-  const [refreshing, setRefreshing] = useState(false)
 
   // read the deploy build; nothing to read while it's queued
   const loadBuild = useCallback(() => {
-    if (!started.buildId) return Promise.resolve()
-    return getDeployBuild(appId, started.buildId)
+    if (!started.buildId) return
+    getDeployBuild(appId, started.buildId)
       .then((data) => {
         setBuild(data)
         setError(data ? '' : `The CI tool has no deploy build #${started.buildId}`)
@@ -190,17 +197,31 @@ export function StartedDeployView({appId, started}: { appId: string, started: St
     loadBuild()
   }, [loadBuild])
 
-  // keeps the current status on screen while reloading
-  async function handleRefresh() {
-    setRefreshing(true)
-    await loadBuild()
-    setRefreshing(false)
-  }
+  // load again while it runs
+  usePollWhileRunning(build, build?.status === 'RUNNING', loadBuild)
+
+  // say once that the build finished
+  const finishedReported = useRef(false)
+  useEffect(() => {
+    if (!build || build.status === 'RUNNING' || finishedReported.current) return
+    finishedReported.current = true
+    onFinished?.()
+  }, [build, onFinished])
+
+  // the title follows the build: spinning while it's queued, loading or running, then how it ended
+  const what = `${appId} ${started.version} to ${started.environment}`
+  const inProgress = !error && (!build || build.status === 'RUNNING')
+  const title = inProgress ? `Deploying ${what}`
+    : build?.status === 'SUCCESS' ? `Deployed ${what}`
+      : `Deploy of ${what} didn't finish`
 
   return (
     <div className="space-y-5">
       <DialogHeader>
-        <DialogTitle className="text-lg">Deploying {appId} {started.version} to {started.environment}</DialogTitle>
+        <DialogTitle className="flex items-center gap-2 text-lg">
+          {inProgress && <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground"/>}
+          {title}
+        </DialogTitle>
         <DialogDescription>
           The deploy job waits for the new pods to be ready, so it fails if they don't start.
         </DialogDescription>
@@ -222,15 +243,6 @@ export function StartedDeployView({appId, started}: { appId: string, started: St
           </a>
         </div>
       )}
-
-      <DialogFooter>
-        {started.buildId && (
-          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
-            Refresh
-          </Button>
-        )}
-      </DialogFooter>
     </div>
   )
 }
@@ -251,7 +263,7 @@ function DeployDialog({appId, environments, pickedEnvironment = null, open, onOp
       {open && (
         <DialogContent className="sm:max-w-lg">
           {started ? (
-            <StartedDeployView appId={appId} started={started}/>
+            <StartedDeployView appId={appId} started={started} onFinished={onDeployed}/>
           ) : (
             <DeployForm appId={appId} environments={environments} pickedEnvironment={pickedEnvironment}
                         onStarted={(s) => {

@@ -8,12 +8,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.operate.OperateToolException;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.Promotion;
+import com.phytion.dashboard.model.Rollback;
+import com.phytion.dashboard.model.RollbackOptions;
 import com.phytion.dashboard.service.AppNotFoundException;
 import com.phytion.dashboard.service.InvalidDeployException;
 import com.phytion.dashboard.service.JenkinsDeployService;
@@ -41,6 +44,9 @@ class JenkinsDeployControllerTests {
     private static final String PROMOTE = """
             {"appId": "sample-app", "fromEnvironment": "dev"}
             """;
+    private static final String ROLLBACK = """
+            {"appId": "sample-app", "environment": "staging", "version": "1.0.0"}
+            """;
 
     @Autowired
     private MockMvc mvc;
@@ -67,6 +73,44 @@ class JenkinsDeployControllerTests {
         when(deployService.getDeployBuild(APP, "99")).thenReturn(Optional.empty());
 
         mvc.perform(get("/api/deploy/deployments/99").param("appId", APP)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser
+    void getRollbackOptionsReturnsTheFromVersionAndTheVersionsToGoTo() throws Exception {
+        when(deployService.listRollbackOptions(APP, "staging"))
+                .thenReturn(new RollbackOptions(APP, "staging", "1.0.2", List.of("1.0.0", "0.0.9")));
+
+        mvc.perform(get("/api/deploy/rollback-options").param("appId", APP).param("environment", "staging"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appId").value(APP))
+                .andExpect(jsonPath("$.environment").value("staging"))
+                .andExpect(jsonPath("$.fromVersion").value("1.0.2"))
+                .andExpect(jsonPath("$.toVersions[0]").value("1.0.0"))
+                .andExpect(jsonPath("$.toVersions[1]").value("0.0.9"));
+    }
+
+    @Test
+    @WithMockUser
+    void getRollbackOptionsWithNothingToGoBackToGivesAnEmptyList() throws Exception {
+        when(deployService.listRollbackOptions(APP, "staging"))
+                .thenReturn(new RollbackOptions(APP, "staging", "1.0.0", List.of()));
+
+        mvc.perform(get("/api/deploy/rollback-options").param("appId", APP).param("environment", "staging"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.toVersions").isEmpty());
+    }
+
+    @Test
+    @WithMockUser
+    void getRollbackOptionsWithoutEnvironmentGives400() throws Exception {
+        mvc.perform(get("/api/deploy/rollback-options").param("appId", APP)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getRollbackOptionsNeedsLogin() throws Exception {
+        mvc.perform(get("/api/deploy/rollback-options").param("appId", APP).param("environment", "staging"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -205,5 +249,68 @@ class JenkinsDeployControllerTests {
 
     private static MockHttpServletRequestBuilder postPromote(String json) {
         return post("/api/deploy/promotions").contentType(MediaType.APPLICATION_JSON).content(json);
+    }
+
+    @Test
+    void rollbackNeedsLogin() throws Exception {
+        mvc.perform(postRollback(ROLLBACK).with(csrf())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser
+    void rollbackNeedsCsrfToken() throws Exception {
+        mvc.perform(postRollback(ROLLBACK)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "andy")
+    void rollbackPassesTheLoggedInUserAndReturnsTheRollback() throws Exception {
+        when(deployService.rollback(APP, "staging", "1.0.0", "andy"))
+                .thenReturn(new Rollback(APP, "staging", "1.0.2", "1.0.0", "7"));
+
+        mvc.perform(postRollback(ROLLBACK).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.appId").value(APP))
+                .andExpect(jsonPath("$.environment").value("staging"))
+                .andExpect(jsonPath("$.fromVersion").value("1.0.2"))
+                .andExpect(jsonPath("$.toVersion").value("1.0.0"))
+                .andExpect(jsonPath("$.buildId").value("7"));
+    }
+
+    @Test
+    @WithMockUser
+    void rollbackWithoutEnvironmentOrVersionGives400() throws Exception {
+        mvc.perform(postRollback("""
+                {"appId": "sample-app", "version": "1.0.0"}
+                """).with(csrf())).andExpect(status().isBadRequest());
+        mvc.perform(postRollback("""
+                {"appId": "sample-app", "environment": "staging"}
+                """).with(csrf())).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "andy")
+    void rollbackWithNothingOlderGives400WithTheReason() throws Exception {
+        when(deployService.rollback(APP, "staging", "1.0.0", "andy")).thenThrow(
+                new InvalidDeployException("sample-app has no older version to roll back to in staging"));
+
+        mvc.perform(postRollback(ROLLBACK).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("sample-app has no older version to roll back to in staging"));
+    }
+
+    @Test
+    @WithMockUser(username = "andy")
+    void rollbackWhenJenkinsIsDownGives502WithTheReason() throws Exception {
+        when(deployService.rollback(APP, "staging", "1.0.0", "andy"))
+                .thenThrow(new CiToolException("Jenkins not reachable"));
+
+        mvc.perform(postRollback(ROLLBACK).with(csrf()))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error").value("Jenkins not reachable"));
+    }
+
+    private static MockHttpServletRequestBuilder postRollback(String json) {
+        return post("/api/deploy/rollbacks").contentType(MediaType.APPLICATION_JSON).content(json);
     }
 }

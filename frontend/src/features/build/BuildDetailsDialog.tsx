@@ -1,4 +1,4 @@
-import {useEffect, useState, type ReactNode} from 'react'
+import {useCallback, useEffect, useState, type ReactNode} from 'react'
 import {Check, Copy, ExternalLink, GitBranch, ScrollText} from 'lucide-react'
 import {Alert, AlertDescription} from '@/components/ui/alert'
 import {Badge} from '@/components/ui/badge'
@@ -16,6 +16,7 @@ import {getBuild, type CiBuildDetails} from '@/api/ci'
 import StatusBadge from './StatusBadge'
 import TestResults from './TestResults'
 import {formatDuration} from '@/lib/format'
+import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
 
 type Props = {
   appId: string
@@ -52,16 +53,29 @@ function CommitHash({commit}: { commit: string }) {
   )
 }
 
-/** Loads one build with its test results (one request) and shows it. Mounted fresh for each build the dialog opens. */
+/**
+ * Loads one build with its test results (one request) and shows it, reading it again every few seconds while it runs.
+ * Mounted fresh for each build the dialog opens.
+ */
 function BuildDetails({appId, buildId}: { appId: string, buildId: string }) {
   const [details, setDetails] = useState<CiBuildDetails | null>(null)
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  const loadBuild = useCallback(() => {
     getBuild(appId, buildId)
-      .then(setDetails)
+      .then((data) => {
+        setDetails(data)
+        setError('')
+      })
       .catch(() => setError('Could not load the build from the CI tool'))
   }, [appId, buildId])
+
+  useEffect(() => {
+    loadBuild()
+  }, [loadBuild])
+
+  // load again while it runs
+  usePollWhileRunning(details, details?.build.status === 'RUNNING', loadBuild)
 
   const build = details?.build
 
@@ -117,11 +131,11 @@ function BuildDetails({appId, buildId}: { appId: string, buildId: string }) {
 
           <DialogFooter>
             <Button variant="outline" asChild>
-              <a href={build.url} target="_blank" rel="noreferrer"><ExternalLink/> Open in Jenkins</a>
+              <a href={build.url} target="_blank" rel="noreferrer">Open in Jenkins <ExternalLink/></a>
             </Button>
             <Button asChild>
               {/* Jenkins' log page for the build */}
-              <a href={`${build.url.replace(/\/?$/, '/')}console`} target="_blank" rel="noreferrer"><ScrollText/> View log</a>
+              <a href={`${build.url.replace(/\/?$/, '/')}console`} target="_blank" rel="noreferrer"><ScrollText/> View log <ExternalLink/></a>
             </Button>
           </DialogFooter>
         </>

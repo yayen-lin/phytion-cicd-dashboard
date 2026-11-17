@@ -51,15 +51,16 @@ class JenkinsAdapterImplTests {
     }
 
     @Test
-    void listBuildsMapsJenkinsBuilds() {
+    void listBuildsMapsJenkinsBuildsWithABuildThatLeftTheQueueButHasNotStartedItsStepsAsRunning() {
         jenkins.expect(requestTo(startsWith("http://jenkins/job/sample-app/api/json")))
                 .andRespond(withSuccess("""
                         {"_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob", "builds": [
                           {"_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
-                           "number": 3, "result": null, "inProgress": true, "timestamp": 1793745100000,
+                           "number": 3, "result": null, "building": true, "inProgress": false,
+                           "timestamp": 1793745100000,
                            "duration": 0, "url": "http://jenkins/job/sample-app/3/", "actions": [{}]},
                           {"_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
-                           "number": 2, "result": "SUCCESS", "inProgress": false, "timestamp": 1793745018832,
+                           "number": 2, "result": "SUCCESS", "building": false, "timestamp": 1793745018832,
                            "duration": 5516, "url": "http://jenkins/job/sample-app/2/",
                            "actions": [{"_class": "hudson.model.CauseAction"}, {},
                              {"_class": "hudson.plugins.git.util.BuildData", "lastBuiltRevision": {
@@ -68,7 +69,7 @@ class JenkinsAdapterImplTests {
                              {"_class": "hudson.tasks.junit.TestResultAction", "totalCount": 6, "failCount": 1,
                               "skipCount": 2, "urlName": "testReport"}]},
                           {"_class": "org.jenkinsci.plugins.workflow.job.WorkflowRun",
-                           "number": 1, "result": "FAILURE", "inProgress": false, "timestamp": 1793744856847,
+                           "number": 1, "result": "FAILURE", "building": false, "timestamp": 1793744856847,
                            "duration": 43745, "url": "http://jenkins/job/sample-app/1/", "actions": []}
                         ]}
                         """, MediaType.APPLICATION_JSON));
@@ -100,7 +101,7 @@ class JenkinsAdapterImplTests {
         jenkins.expect(requestTo(startsWith("http://jenkins/job/sample-app-deploy/api/json")))
                 .andRespond(withSuccess("""
                         {"builds": [
-                          {"number": 4, "result": "FAILURE", "inProgress": false, "timestamp": 1793745018832,
+                          {"number": 4, "result": "FAILURE", "building": false, "timestamp": 1793745018832,
                            "duration": 90000, "url": "http://jenkins/job/sample-app-deploy/4/", "actions": [
                              {"_class": "hudson.model.ParametersAction", "parameters": [
                                {"_class": "hudson.model.StringParameterValue", "name": "VERSION", "value": "1.0.1"},
@@ -109,7 +110,7 @@ class JenkinsAdapterImplTests {
                              {"_class": "hudson.model.CauseAction", "causes": [
                                {"_class": "hudson.model.Cause$UserIdCause", "userId": "andy", "userName": "Andy Lin"}]},
                              {}]},
-                          {"number": 3, "result": "SUCCESS", "inProgress": false, "timestamp": 1793744856847,
+                          {"number": 3, "result": "SUCCESS", "building": false, "timestamp": 1793744856847,
                            "duration": 1000, "url": "http://jenkins/job/sample-app-deploy/3/", "actions": []}
                         ]}
                         """, MediaType.APPLICATION_JSON));
@@ -129,7 +130,7 @@ class JenkinsAdapterImplTests {
     void getBuildReturnsOneBuild() {
         jenkins.expect(requestTo(startsWith("http://jenkins/job/sample-app/2/api/json")))
                 .andRespond(withSuccess("""
-                        {"number": 2, "result": "ABORTED", "inProgress": false, "timestamp": 1793745018832,
+                        {"number": 2, "result": "ABORTED", "building": false, "timestamp": 1793745018832,
                          "duration": 1000, "url": "http://jenkins/job/sample-app/2/"}
                         """, MediaType.APPLICATION_JSON));
 
@@ -142,7 +143,7 @@ class JenkinsAdapterImplTests {
     void getBuildReadsTheJenkinsUserWhoStartedIt() {
         jenkins.expect(requestTo(startsWith("http://jenkins/job/sample-app/5/api/json")))
                 .andRespond(withSuccess("""
-                        {"number": 5, "result": "SUCCESS", "inProgress": false, "timestamp": 1793745018832,
+                        {"number": 5, "result": "SUCCESS", "building": false, "timestamp": 1793745018832,
                          "duration": 1000, "url": "http://jenkins/job/sample-app/5/", "actions": [
                            {"_class": "hudson.model.CauseAction", "causes": [
                              {"_class": "hudson.model.Cause$UserIdCause", "userId": "andy", "userName": "Andy Lin"}]},
@@ -156,7 +157,7 @@ class JenkinsAdapterImplTests {
     void getBuildStartedByAPushHasNoUser() {
         jenkins.expect(requestTo(startsWith("http://jenkins/job/sample-app/6/api/json")))
                 .andRespond(withSuccess("""
-                        {"number": 6, "result": "SUCCESS", "inProgress": false, "timestamp": 1793745018832,
+                        {"number": 6, "result": "SUCCESS", "building": false, "timestamp": 1793745018832,
                          "duration": 1000, "url": "http://jenkins/job/sample-app/6/", "actions": [
                            {"_class": "hudson.model.CauseAction", "causes": [
                              {"_class": "hudson.triggers.SCMTrigger$SCMTriggerCause"}]}]}

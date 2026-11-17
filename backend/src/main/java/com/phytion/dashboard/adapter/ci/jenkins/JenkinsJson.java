@@ -19,17 +19,17 @@ final class JenkinsJson {
 
     // jenkin's build fields
     static final String BUILD_FIELDS =
-            "number,result,inProgress,timestamp,duration,url,"
+            "number,result,building,timestamp,duration,url,"
                     + "actions[lastBuiltRevision[SHA1,branch[name]],totalCount,failCount,skipCount]";
 
     // BUILD_FIELDS plus what started the build
     static final String BUILD_DETAIL_FIELDS =
-            "number,result,inProgress,timestamp,duration,url,"
+            "number,result,building,timestamp,duration,url,"
                     + "actions[lastBuiltRevision[SHA1,branch[name]],totalCount,failCount,skipCount,causes[userId,userName]]";
 
     // BUILD_FIELDS plus what started the build and its parameters (version and env)
     static final String PARAMETERIZED_BUILD_FIELDS =
-            "number,result,inProgress,timestamp,duration,url,"
+            "number,result,building,timestamp,duration,url,"
                     + "actions[lastBuiltRevision[SHA1,branch[name]],totalCount,failCount,skipCount,causes[userId,userName],"
                     + "parameters[name,value]]";
 
@@ -41,7 +41,7 @@ final class JenkinsJson {
     record Build(
             long number,
             String result,
-            boolean inProgress,
+            boolean building,
             long timestamp,
             long duration,
             String url,

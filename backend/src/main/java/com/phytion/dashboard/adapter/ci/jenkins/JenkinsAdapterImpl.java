@@ -204,7 +204,7 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
                 commit,
                 branch,
                 Instant.ofEpochMilli(build.timestamp()),
-                build.inProgress() ? null : build.duration(),
+                build.building() ? null : build.duration(),
                 build.url(),
                 testCounts(build));
     }
@@ -304,7 +304,7 @@ public class JenkinsAdapterImpl implements JenkinsAdapter {
     }
 
     private static CiBuild.Status toStatus(JenkinsJson.Build build) {
-        if (build.inProgress()) {
+        if (build.building()) {
             return CiBuild.Status.RUNNING;
         }
         if (build.result() == null) {

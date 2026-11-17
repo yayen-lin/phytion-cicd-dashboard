@@ -117,7 +117,9 @@ function AppPage() {
             )}
             {tab === 'builds' && <BuildsTable key={app.id} appId={app.id}/>}
             {tab === 'versions' && (app.release ? <VersionsTable key={app.id} app={app} onReleaseClick={() => setRelease({pickedCommit: null})}/> : <NotConfigured part="release"/>)}
-            {tab === 'environments' && (app.deploy ? <AppEnvironmentsTable key={app.id} appId={app.id}/> : <NotConfigured part="deploy"/>)}
+            {tab === 'environments' && (app.deploy ? <AppEnvironmentsTable key={app.id} app={app}
+                                                                                       onReleaseClick={() => setRelease({pickedCommit: null})}
+                                                                                       onViewBuild={setSelectedBuildId}/> : <NotConfigured part="deploy"/>)}
           </div>
 
           {app.release && (

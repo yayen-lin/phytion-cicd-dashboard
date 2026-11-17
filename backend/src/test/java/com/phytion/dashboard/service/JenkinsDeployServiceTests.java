@@ -2,7 +2,9 @@ package com.phytion.dashboard.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -30,6 +32,8 @@ import com.phytion.dashboard.model.DeployJob;
 import com.phytion.dashboard.model.DeployRun;
 import com.phytion.dashboard.model.OperateWorkload;
 import com.phytion.dashboard.model.Promotion;
+import com.phytion.dashboard.model.Rollback;
+import com.phytion.dashboard.model.RollbackOptions;
 import com.phytion.dashboard.model.ReleaseImage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -336,6 +340,201 @@ class JenkinsDeployServiceTests {
         assertThatThrownBy(() -> deployService.promote(APP, null, "andy"))
                 .isInstanceOf(InvalidDeployException.class);
         verifyNoInteractions(jenkins, kubernetes, audit);
+    }
+
+    @Test
+    void rollbackOptionsAreTheSuccessfulVersionsBelowTheNewestHighestFirstSkippingFailedDeploysAndOtherEnvironments() {
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                deployRun("6", "1.0.2", "staging", CiBuild.Status.SUCCESS),
+                deployRun("5", "1.0.1", "staging", CiBuild.Status.FAILED),
+                deployRun("4", "1.0.1", "dev", CiBuild.Status.SUCCESS),
+                deployRun("3", "1.0.0", "staging", CiBuild.Status.SUCCESS),
+                deployRun("2", "0.0.9", "staging", CiBuild.Status.SUCCESS)));
+
+        assertThat(deployService.listRollbackOptions(APP, "staging"))
+                .isEqualTo(new RollbackOptions(APP, "staging", "1.0.2", List.of("1.0.0", "0.0.9")));
+    }
+
+    @Test
+    void rollbackOptionsAfterARollbackStartFromTheVersionItWentTo() {
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                // the rollback: a deploy of 1.0.0
+                deployRun("7", "1.0.0", "staging", CiBuild.Status.SUCCESS),
+                deployRun("6", "1.0.2", "staging", CiBuild.Status.SUCCESS),
+                deployRun("3", "1.0.0", "staging", CiBuild.Status.SUCCESS),
+                deployRun("2", "0.0.9", "staging", CiBuild.Status.SUCCESS)));
+
+        assertThat(deployService.listRollbackOptions(APP, "staging"))
+                .isEqualTo(new RollbackOptions(APP, "staging", "1.0.0", List.of("0.0.9")));
+    }
+
+    @Test
+    void rollbackOptionsAreSortedByNumberWithoutRepeats() {
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                deployRun("4", "1.0.10", "staging", CiBuild.Status.SUCCESS),
+                deployRun("3", "1.0.2", "staging", CiBuild.Status.SUCCESS),
+                deployRun("2", "1.0.9", "staging", CiBuild.Status.SUCCESS),
+                deployRun("1", "1.0.2", "staging", CiBuild.Status.SUCCESS)));
+
+        assertThat(deployService.listRollbackOptions(APP, "staging"))
+                .isEqualTo(new RollbackOptions(APP, "staging", "1.0.10", List.of("1.0.9", "1.0.2")));
+    }
+
+    @Test
+    void rollbackOptionsAreEmptyWithNothingLowerOrNothingDeployed() {
+        // only the same or higher versions before the current one
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                deployRun("3", "1.0.0", "staging", CiBuild.Status.SUCCESS),
+                deployRun("2", "1.0.2", "staging", CiBuild.Status.SUCCESS),
+                deployRun("1", "1.0.0", "staging", CiBuild.Status.SUCCESS)));
+        assertThat(deployService.listRollbackOptions(APP, "staging"))
+                .isEqualTo(new RollbackOptions(APP, "staging", "1.0.0", List.of()));
+
+        // no successful deploy there
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                deployRun("2", "1.0.1", "staging", CiBuild.Status.FAILED),
+                deployRun("1", "1.0.0", "dev", CiBuild.Status.SUCCESS)));
+        assertThat(deployService.listRollbackOptions(APP, "staging"))
+                .isEqualTo(new RollbackOptions(APP, "staging", null, List.of()));
+    }
+
+    @Test
+    void rollbackOptionsOfAnUnknownEnvironmentOrAppAreRejected() {
+        assertThatThrownBy(() -> deployService.listRollbackOptions(APP, "test"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("Environments are dev, staging, prod, got: test");
+        assertThatThrownBy(() -> deployService.listRollbackOptions(null, "staging"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("No app given");
+        assertThatThrownBy(() -> deployService.listRollbackOptions("other-app", "staging"))
+                .isInstanceOf(AppNotFoundException.class);
+        assertThatThrownBy(() -> deployService.listRollbackOptions("undeployed-app", "staging"))
+                .isInstanceOf(AppNotFoundException.class);
+        verifyNoInteractions(jenkins);
+    }
+
+    @Test
+    void listDeploysNamesTheDashboardUserWhoRolledBack() {
+        CiBuild build11 = deployBuild("11");
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                new CiParameterizedBuild(build11, STAGING_1_0_1, "dashboard-bot")));
+        when(audit.getRecentEntries(new AuditFilter(APP, AuditEntry.ActionType.ROLLBACK, null,
+                AuditEntry.ActionResult.SUCCESS, null, null, null))).thenReturn(List.of(
+                new AuditEntry("sam", AuditEntry.ActionType.ROLLBACK, APP, Instant.now(),
+                        AuditEntry.ActionResult.SUCCESS, "11", "1.0.2 to 1.0.1 in staging", "staging", "1.0.1")));
+
+        assertThat(deployService.listDeploys(APP)).containsExactly(
+                new DeployRun(APP, "1.0.1", "staging", build11, "sam"));
+    }
+
+    @Test
+    void rollbackDeploysThePickedVersionAndRecordsIt() {
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                deployRun("6", "1.0.2", "staging", CiBuild.Status.SUCCESS),
+                deployRun("5", "1.0.1", "staging", CiBuild.Status.FAILED),
+                deployRun("3", "1.0.0", "staging", CiBuild.Status.SUCCESS),
+                deployRun("2", "0.0.9", "staging", CiBuild.Status.SUCCESS)));
+        when(jenkins.triggerBuild(DEPLOY_JOB, Map.of("VERSION", "0.0.9", "ENVIRONMENT", "staging")))
+                .thenReturn(Optional.of("7"));
+
+        // not only the previous good version: any of the options
+        assertThat(deployService.rollback(APP, "staging", "0.0.9", "andy"))
+                .isEqualTo(new Rollback(APP, "staging", "1.0.2", "0.0.9", "7"));
+
+        verify(audit).add("andy", AuditEntry.ActionType.ROLLBACK, APP, AuditEntry.ActionResult.SUCCESS, "7",
+                "1.0.2 to 0.0.9 in staging", "staging", "0.0.9");
+    }
+
+    @Test
+    void rollbackWhoseBuildIsStillQueuedIsRecordedWithoutBuildId() {
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                deployRun("6", "1.0.2", "staging", CiBuild.Status.SUCCESS),
+                deployRun("3", "1.0.0", "staging", CiBuild.Status.SUCCESS)));
+        when(jenkins.triggerBuild(DEPLOY_JOB, Map.of("VERSION", "1.0.0", "ENVIRONMENT", "staging")))
+                .thenReturn(Optional.empty());
+
+        assertThat(deployService.rollback(APP, "staging", "1.0.0", "andy"))
+                .isEqualTo(new Rollback(APP, "staging", "1.0.2", "1.0.0", null));
+
+        verify(audit).add("andy", AuditEntry.ActionType.ROLLBACK, APP, AuditEntry.ActionResult.SUCCESS, null,
+                "1.0.2 to 1.0.0 in staging; queued, but the CI tool hadn't started it yet", "staging", "1.0.0");
+    }
+
+    @Test
+    void rollbackWhoseDeployJobDoesNotStartIsRecordedWithTheReason() {
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                deployRun("6", "1.0.2", "staging", CiBuild.Status.SUCCESS),
+                deployRun("3", "1.0.0", "staging", CiBuild.Status.SUCCESS)));
+        when(jenkins.triggerBuild(DEPLOY_JOB, Map.of("VERSION", "1.0.0", "ENVIRONMENT", "staging")))
+                .thenThrow(new CiToolException("Jenkins not reachable"));
+
+        assertThatThrownBy(() -> deployService.rollback(APP, "staging", "1.0.0", "andy"))
+                .isInstanceOf(CiToolException.class);
+
+        verify(audit).add("andy", AuditEntry.ActionType.ROLLBACK, APP, AuditEntry.ActionResult.FAILED, null,
+                "1.0.2 to 1.0.0 in staging: Jenkins not reachable", "staging", "1.0.0");
+    }
+
+    @Test
+    void rollbackWhenTheDeployHistoryCanNotBeReadIsRecordedAndNoJobStarts() {
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenThrow(new CiToolException("Jenkins not reachable"));
+
+        assertThatThrownBy(() -> deployService.rollback(APP, "staging", "1.0.0", "andy"))
+                .isInstanceOf(CiToolException.class);
+
+        verify(audit).add("andy", AuditEntry.ActionType.ROLLBACK, APP, AuditEntry.ActionResult.FAILED, null,
+                "to 1.0.0 in staging: couldn't read the deploy history: Jenkins not reachable", "staging", "1.0.0");
+        verify(jenkins, never()).triggerBuild(any(), any());
+    }
+
+    @Test
+    void rollbackWithNothingOlderIsRejected() {
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                deployRun("3", "1.0.0", "staging", CiBuild.Status.SUCCESS)));
+
+        assertThatThrownBy(() -> deployService.rollback(APP, "staging", "0.0.9", "andy"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("sample-app has no older version to roll back to in staging");
+        verify(jenkins, never()).triggerBuild(any(), any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void rollbackToAVersionThatIsNotAnOptionIsRejected() {
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                deployRun("6", "1.0.2", "staging", CiBuild.Status.SUCCESS),
+                deployRun("5", "1.0.1", "staging", CiBuild.Status.FAILED),
+                deployRun("4", "1.0.1", "dev", CiBuild.Status.SUCCESS),
+                deployRun("3", "1.0.0", "staging", CiBuild.Status.SUCCESS)));
+
+        // failed there, only deployed elsewhere, the current one, or higher
+        for (String version : new String[]{"1.0.1", "1.0.2", "1.0.3"}) {
+            assertThatThrownBy(() -> deployService.rollback(APP, "staging", version, "andy"))
+                    .isInstanceOf(InvalidDeployException.class)
+                    .hasMessage("sample-app can roll back in staging to 1.0.0, got: " + version);
+        }
+        verify(jenkins, never()).triggerBuild(any(), any());
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void rollbackOfAnUnknownEnvironmentOrAppIsRejectedBeforeAnythingHappens() {
+        assertThatThrownBy(() -> deployService.rollback(APP, "test", "1.0.0", "andy"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("Environments are dev, staging, prod, got: test");
+        assertThatThrownBy(() -> deployService.rollback(null, "staging", "1.0.0", "andy"))
+                .isInstanceOf(InvalidDeployException.class)
+                .hasMessage("No app given");
+        assertThatThrownBy(() -> deployService.rollback("undeployed-app", "staging", "1.0.0", "andy"))
+                .isInstanceOf(AppNotFoundException.class);
+        verifyNoInteractions(jenkins, audit);
+    }
+
+    private static CiParameterizedBuild deployRun(String id, String version, String environment,
+                                                  CiBuild.Status status) {
+        CiBuild build = new CiBuild(id, status, null, null, Instant.parse("2026-11-13T18:31:00Z"), 1000L,
+                "http://localhost:8081/job/sample-app-deploy-job/" + id + "/", null);
+        return new CiParameterizedBuild(build, Map.of("VERSION", version, "ENVIRONMENT", environment), "admin");
     }
 
     @Test

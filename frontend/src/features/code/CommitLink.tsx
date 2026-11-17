@@ -1,6 +1,7 @@
+import {ExternalLink} from 'lucide-react'
 import type {CodeCommit} from '@/api/code'
 
-/** The short commit hash, linking to the commit in the code tool. */
+/** The short commit hash, linking to the commit in the code tool, in a new tab. */
 function CommitLink({commit}: { commit: Pick<CodeCommit, 'hash' | 'url'> }) {
   return (
     <a
@@ -8,9 +9,10 @@ function CommitLink({commit}: { commit: Pick<CodeCommit, 'hash' | 'url'> }) {
       target="_blank"
       rel="noreferrer"
       title={commit.hash}
-      className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs hover:underline"
+      className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs hover:underline"
     >
       {commit.hash.slice(0, 7)}
+      <ExternalLink className="size-3 text-muted-foreground"/>
     </a>
   )
 }

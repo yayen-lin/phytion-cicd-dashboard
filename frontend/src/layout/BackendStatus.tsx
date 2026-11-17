@@ -9,7 +9,7 @@ function BackendStatus() {
 
   useEffect(() => {
     getBackendStatus()
-      .then(setStatus)
+      .then((data) => setStatus(data.status))
       .catch(() => setStatus('not reachable'))
   }, [])
 

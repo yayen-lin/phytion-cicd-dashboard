@@ -34,7 +34,7 @@ type Props = {
   choices: PromoteChoice[]
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** After the deploy job was started, e.g. to reload what runs where */
+  /** After the deploy job was started, and again when its build finished, e.g. to reload what runs where */
   onPromoted?: () => void
 }
 
@@ -155,7 +155,7 @@ function PromoteDialog({appId, choices, open, onOpenChange, onPromoted}: Props) 
       {open && (
         <DialogContent className="sm:max-w-lg">
           {started ? (
-            <StartedDeployView appId={appId} started={started}/>
+            <StartedDeployView appId={appId} started={started} onFinished={onPromoted}/>
           ) : (
             <PromoteForm appId={appId} choices={choices}
                          onStarted={(s) => {

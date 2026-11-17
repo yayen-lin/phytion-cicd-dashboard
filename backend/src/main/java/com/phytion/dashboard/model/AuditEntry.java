@@ -2,7 +2,6 @@ package com.phytion.dashboard.model;
 
 import java.time.Instant;
 
-import jakarta.annotation.Nonnull;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -25,7 +24,8 @@ public class AuditEntry {
         BUILD,
         RELEASE,
         DEPLOY,
-        PROMOTE
+        PROMOTE,
+        ROLLBACK
     }
 
     public enum ActionResult {

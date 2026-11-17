@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useState} from 'react'
-import {GitBranch, RefreshCw} from 'lucide-react'
+import {ExternalLink, GitBranch, RefreshCw} from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
@@ -78,6 +78,7 @@ function BranchesTable({appId}: Props) {
                   <TableCell className="font-medium">
                     <a href={branch.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">
                       <GitBranch className="size-3.5 text-muted-foreground"/>{branch.name}
+                      <ExternalLink className="size-3.5 text-muted-foreground"/>
                     </a>
                   </TableCell>
                   <TableCell>

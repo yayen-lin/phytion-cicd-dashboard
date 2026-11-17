@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useState, type KeyboardEvent} from 'react'
 import {useNavigate, useParams} from 'react-router'
-import {ArrowUpRight, MoreHorizontal, RefreshCw, Rocket, Server, Undo2} from 'lucide-react'
+import {toast} from 'sonner'
+import {ArrowUpRight, MoreHorizontal, Play, RefreshCw, Rocket, Server, Tag, Undo2} from 'lucide-react'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Button} from '@/components/ui/button'
 import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -13,16 +14,22 @@ import {
 import {Skeleton} from '@/components/ui/skeleton'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {getEnvironments, type EnvironmentApp, type EnvironmentStatus} from '@/api/deploy'
+import {getApp, type App} from '@/api/apps'
+import {triggerBuild} from '@/api/ci'
+import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import CommitLink from '@/features/code/CommitLink'
 import DeployDialog from '@/features/deploy/DeployDialog'
 import PromoteDialog from '@/features/deploy/PromoteDialog'
+import RollbackDialog from '@/features/deploy/RollbackDialog'
+import ReleaseDialog from '@/features/release/ReleaseDialog'
+import {showReleaseStarted} from '@/features/release/releaseToast'
 import HealthBadge from './HealthBadge'
 import {deployedLabel} from '@/features/deploy/deployedLabel'
 
 /**
  * One environment's page (/environments/staging), from one request: one row per app running there with its version,
- * health, and who deployed it and when. A row's menu deploys another version or promotes the running one to the next
- * environment; clicking a row opens the app's page.
+ * health, and who deployed it and when. A row's menu runs a build, releases, deploys another version, promotes the
+ * running one to the next environment, or rolls it back one good version; clicking a row opens the app's page.
  */
 function EnvironmentPage() {
   const {environment = ''} = useParams()
@@ -31,10 +38,16 @@ function EnvironmentPage() {
   const [loaded, setLoaded] = useState<{ environment: string, status: EnvironmentStatus } | null>(null)
   const [error, setError] = useState<{ environment: string, message: string } | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  // the app whose Release dialog is open, or null when it is closed
+  const [releasing, setReleasing] = useState<App | null>(null)
   // the app whose Deploy dialog is open, or null when it is closed
   const [deployingAppId, setDeployingAppId] = useState<string | null>(null)
   // the app whose Promote dialog is open, or null when it is closed
   const [promotingApp, setPromotingApp] = useState<EnvironmentApp | null>(null)
+  // the app whose Rollback dialog is open, or null when it is closed
+  const [rollingBackAppId, setRollingBackAppId] = useState<string | null>(null)
+  // the build shown in the details modal, or null when it is closed
+  const [selectedBuild, setSelectedBuild] = useState<{ appId: string, buildId: string } | null>(null)
 
   const loadEnvironment = useCallback(() => {
     return getEnvironments({environment})
@@ -54,6 +67,38 @@ function EnvironmentPage() {
     setRefreshing(true)
     await loadEnvironment()
     setRefreshing(false)
+  }
+
+  // start a build and say so, with a button to open it
+  async function handleRunBuild(appId: string) {
+    try {
+      const buildId = await triggerBuild(appId)
+      if (buildId) {
+        toast.success(`Started build #${buildId} of ${appId}`, {
+          action: {label: 'View build', onClick: () => setSelectedBuild({appId, buildId})},
+        })
+      } else {
+        toast.info(`Build of ${appId} queued, but the CI tool has not started it yet`)
+      }
+    } catch {
+      toast.error(`Could not start a build of ${appId}`)
+    }
+  }
+
+  // the Release dialog needs the app's config, so read it first
+  async function openRelease(appId: string) {
+    try {
+      const app = await getApp(appId)
+      if (app) setReleasing(app)
+      else toast.error(`Unknown app: ${appId}`)
+    } catch {
+      toast.error(`Could not load ${appId}`)
+    }
+  }
+
+  function handleReleased(app: App, version: string, buildId: string | null) {
+    setReleasing(null)
+    showReleaseStarted(version, buildId, (id) => setSelectedBuild({appId: app.id, buildId: id}))
   }
 
   // a row opens its app's page, by click or by Enter / Space
@@ -141,8 +186,14 @@ function EnvironmentPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => handleRunBuild(app.appId)}>
+                            <Play/> Run build
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => openRelease(app.appId)}>
+                            <Tag/> Release
+                          </DropdownMenuItem>
                           <DropdownMenuItem onSelect={() => setDeployingAppId(app.appId)}>
-                            <Rocket/> Deploy a version
+                            <Rocket/> Deploy
                           </DropdownMenuItem>
                           {/* no promote from the last environment, or of a version that can't be told */}
                           {status?.nextEnvironment && (
@@ -150,10 +201,8 @@ function EnvironmentPage() {
                               <ArrowUpRight/> Promote
                             </DropdownMenuItem>
                           )}
-                          {/* rollback comes in step 2.6 */}
-                          <DropdownMenuItem disabled>
+                          <DropdownMenuItem onSelect={() => setRollingBackAppId(app.appId)}>
                             <Undo2/> Rollback
-                            <span className="ml-auto text-xs text-muted-foreground">soon</span>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -166,6 +215,11 @@ function EnvironmentPage() {
         </CardContent>
       </Card>
 
+      {releasing && (
+        <ReleaseDialog app={releasing} open onOpenChange={(open) => !open && setReleasing(null)}
+                       onReleased={(version, buildId) => handleReleased(releasing, version, buildId)}/>
+      )}
+
       {deployingAppId && status && (
         <DeployDialog appId={deployingAppId} pickedEnvironment={environment}
                       environments={[{name: environment, needsConfirmation: status.needsConfirmation}]}
@@ -177,6 +231,15 @@ function EnvironmentPage() {
                        choices={[{version: promotingApp.version, fromEnvironment: environment, toEnvironment: status.nextEnvironment}]}
                        open onOpenChange={(open) => !open && setPromotingApp(null)} onPromoted={loadEnvironment}/>
       )}
+
+      {rollingBackAppId && status && (
+        <RollbackDialog appId={rollingBackAppId}
+                        environments={[{name: environment, needsConfirmation: status.needsConfirmation}]}
+                        open onOpenChange={(open) => !open && setRollingBackAppId(null)} onRolledBack={loadEnvironment}/>
+      )}
+
+      <BuildDetailsDialog appId={selectedBuild?.appId ?? ''} buildId={selectedBuild?.buildId ?? null}
+                          onClose={() => setSelectedBuild(null)}/>
     </div>
   )
 }

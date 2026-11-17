@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState, type KeyboardEvent} from 'react'
 import {useNavigate} from 'react-router'
 import {toast} from 'sonner'
-import {ArrowUpRight, MoreHorizontal, Play, RefreshCw, Rocket, Tag} from 'lucide-react'
+import {ArrowUpRight, MoreHorizontal, Play, RefreshCw, Rocket, Tag, Undo2} from 'lucide-react'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Button} from '@/components/ui/button'
 import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
@@ -20,9 +20,11 @@ import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import StatusBadge from '@/features/build/StatusBadge'
 import DeployDialog from '@/features/deploy/DeployDialog'
 import PromoteDialog, {type PromoteChoice} from '@/features/deploy/PromoteDialog'
+import RollbackDialog from '@/features/deploy/RollbackDialog'
 import ReleaseDialog from '@/features/release/ReleaseDialog'
 import {showReleaseStarted} from '@/features/release/releaseToast'
 import {cn} from '@/lib/utils'
+import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
 
 /** What a cell shows when its tool couldn't be reached */
 function Unavailable() {
@@ -63,8 +65,19 @@ function promoteChoices(summary: AppSummary, environments: Environment[]): Promo
 }
 
 /**
- * Every app (/apps): latest build, latest version and what runs in each environment, from one request.
- * A row's menu runs a build, releases, deploys or promotes; clicking a row opens the app's page.
+ * The environments an app can roll back: the ones where a version runs.
+ * e.g. sample-app 1.0.1 in dev and staging -> [dev, staging]
+ * Returns none when the app isn't deployed or the operate tool couldn't be reached.
+ */
+function rollbackEnvironments(summary: AppSummary, environments: Environment[]): Environment[] {
+  if (!summary.app.deploy || summary.unavailable.includes('ENVIRONMENTS')) return []
+  return environments.filter((e) => summary.deployments.find((d) => d.environment === e.name)?.state.version)
+}
+
+/**
+ * Every app (/apps): latest build and what runs in each environment, from one request; updates itself
+ * while a latest build runs.
+ * A row's menu runs a build, releases, deploys, promotes or rolls back; clicking a row opens the app's page.
  */
 function AppsPage() {
   const navigate = useNavigate()
@@ -77,6 +90,8 @@ function AppsPage() {
   const [deploying, setDeploying] = useState<App | null>(null)
   // the app and what it can promote, of the open Promote dialog, or null when it is closed
   const [promoting, setPromoting] = useState<{ appId: string, choices: PromoteChoice[] } | null>(null)
+  // the app and the environments it can roll back, of the open Rollback dialog, or null when it is closed
+  const [rollingBack, setRollingBack] = useState<{ appId: string, environments: Environment[] } | null>(null)
   // the build shown in the details modal, or null when it is closed
   const [selectedBuild, setSelectedBuild] = useState<{ appId: string, buildId: string } | null>(null)
 
@@ -92,6 +107,9 @@ function AppsPage() {
   useEffect(() => {
     loadSummary()
   }, [loadSummary])
+
+  // load again while a latest build runs
+  usePollWhileRunning(summary, !!summary?.apps.some((s) => s.latestBuild?.status === 'RUNNING'), loadSummary)
 
   // keeps the current rows on screen while reloading
   async function handleRefresh() {
@@ -172,7 +190,6 @@ function AppsPage() {
                 <TableRow>
                   <TableHead>App</TableHead>
                   <TableHead>Latest build</TableHead>
-                  <TableHead>Latest version</TableHead>
                   {summary.environments.map((e) => <TableHead key={e.name}>{e.name}</TableHead>)}
                   <TableHead className="w-10"><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
@@ -191,12 +208,6 @@ function AppsPage() {
                           <StatusBadge status={s.latestBuild.status}/>
                         </span>
                       ) : <span className="text-sm text-muted-foreground">No builds yet</span>}
-                    </TableCell>
-                    <TableCell>
-                      {!s.app.release ? <span className="text-muted-foreground">-</span>
-                        : s.unavailable.includes('VERSION') ? <Unavailable/>
-                          : s.latestVersion ? <span className="font-mono text-sm">{s.latestVersion.version}</span>
-                            : <span className="text-sm text-muted-foreground">Not released yet</span>}
                     </TableCell>
                     {summary.environments.map((e) => (
                       <TableCell key={e.name}><EnvironmentCell summary={s} environment={e.name}/></TableCell>
@@ -229,6 +240,16 @@ function AppsPage() {
                               </DropdownMenuItem>
                             )
                           })()}
+                          {/* disabled when nothing runs in any environment */}
+                          {(() => {
+                            const environments = rollbackEnvironments(s, summary.environments)
+                            return (
+                              <DropdownMenuItem disabled={environments.length === 0}
+                                                onSelect={() => setRollingBack({appId: s.app.id, environments})}>
+                                <Undo2/> Rollback
+                              </DropdownMenuItem>
+                            )
+                          })()}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -251,6 +272,10 @@ function AppsPage() {
       {promoting && (
         <PromoteDialog appId={promoting.appId} choices={promoting.choices}
                        open onOpenChange={(open) => !open && setPromoting(null)} onPromoted={loadSummary}/>
+      )}
+      {rollingBack && (
+        <RollbackDialog appId={rollingBack.appId} environments={rollingBack.environments}
+                        open onOpenChange={(open) => !open && setRollingBack(null)} onRolledBack={loadSummary}/>
       )}
       <BuildDetailsDialog appId={selectedBuild?.appId ?? ''} buildId={selectedBuild?.buildId ?? null}
                           onClose={() => setSelectedBuild(null)}/>

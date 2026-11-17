@@ -2,6 +2,8 @@ package com.phytion.dashboard.controller;
 
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.Promotion;
+import com.phytion.dashboard.model.Rollback;
+import com.phytion.dashboard.model.RollbackOptions;
 import com.phytion.dashboard.service.JenkinsDeployService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -43,6 +45,23 @@ public class JenkinsDeployController {
     }
 
     /**
+     * Starts the app's deploy job with an older version, one of the rollback options
+     */
+    @PostMapping("/api/deploy/rollbacks")
+    public Rollback rollback(@RequestBody @Valid RollbackRequest request, Authentication authentication) {
+        return deployService.rollback(request.appId(), request.environment(), request.version(),
+                authentication.getName());
+    }
+
+    /**
+     * The versions a rollback in an environment can go to
+     */
+    @GetMapping("/api/deploy/rollback-options")
+    public RollbackOptions getRollbackOptions(@RequestParam String appId, @RequestParam String environment) {
+        return deployService.listRollbackOptions(appId, environment);
+    }
+
+    /**
      * One build of the app's deploy job
      */
     @GetMapping("/api/deploy/deployments/{buildId}")
@@ -63,6 +82,14 @@ public class JenkinsDeployController {
      * @param fromEnvironment the environment whose running version moves to the next one
      */
     public record PromoteRequest(@NotBlank String appId, @NotBlank String fromEnvironment) {
+    }
+
+    /**
+     * @param appId       the name of the app
+     * @param environment the environment to roll back
+     * @param version     the version to go back to, one of the rollback options
+     */
+    public record RollbackRequest(@NotBlank String appId, @NotBlank String environment, @NotBlank String version) {
     }
 
     /**

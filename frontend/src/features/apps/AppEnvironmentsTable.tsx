@@ -1,5 +1,6 @@
 import {useCallback, useEffect, useState} from 'react'
-import {ArrowUpRight, MoreHorizontal, RefreshCw} from 'lucide-react'
+import {toast} from 'sonner'
+import {ArrowUpRight, MoreHorizontal, Play, RefreshCw, Rocket, Tag, Undo2} from 'lucide-react'
 import {Button} from '@/components/ui/button'
 import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
 import {
@@ -11,43 +12,62 @@ import {
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
+import type {App} from '@/api/apps'
+import {triggerBuild} from '@/api/ci'
 import {getEnvironments, type EnvironmentApp} from '@/api/deploy'
 import type {Environment} from '@/api/environments'
 import CommitLink from '@/features/code/CommitLink'
 import HealthBadge from '@/features/environments/HealthBadge'
 import {deployedLabel} from '@/features/deploy/deployedLabel'
+import DeployDialog from '@/features/deploy/DeployDialog'
 import PromoteDialog from '@/features/deploy/PromoteDialog'
+import RollbackDialog from '@/features/deploy/RollbackDialog'
 
 type Props = {
-  /** An app that is deployed, e.g. "sample-app" */
-  appId: string
+  /** An app that is deployed */
+  app: App
+  /** Opens the Release dialog */
+  onReleaseClick: () => void
+  /** Opens a build's details */
+  onViewBuild: (buildId: string) => void
 }
 
-/** One environment's row: the app in it, and the environment a promote goes to (null for the last one) */
+/**
+ * One environment's row: the app in it, whether a deploy there must be confirmed, and the environment a promote goes
+ * to (null for the last one)
+ */
 type Row = {
-  environment: string
+  environment: Environment
   nextEnvironment: Environment | null
   app: EnvironmentApp
 }
 
 /**
  * Where one app runs: one row per environment with its version, health, and who deployed it and when. A row's menu
- * promotes the running version to the next environment.
+ * runs a build, releases, deploys to that environment, promotes the running version to the next one, or rolls it back.
  */
-function AppEnvironmentsTable({appId}: Props) {
+function AppEnvironmentsTable({app: configuredApp, onReleaseClick, onViewBuild}: Props) {
+  const appId = configuredApp.id
   // null while loading
   const [rows, setRows] = useState<Row[] | null>(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   // the row whose Promote dialog is open, or null when it is closed
   const [promotingRow, setPromotingRow] = useState<Row | null>(null)
+  // the environment whose Deploy or Rollback dialog is open, or null when it is closed
+  const [deployingTo, setDeployingTo] = useState<Environment | null>(null)
+  const [rollingBack, setRollingBack] = useState<Environment | null>(null)
 
   const loadEnvironments = useCallback(() => {
     return getEnvironments({appId})
       .then((environments) => {
         // one row per environment: the app is the only one in each
         setRows(environments
-          .map((e) => ({environment: e.environment, nextEnvironment: e.nextEnvironment, app: e.apps[0]}))
+          .map((e) => ({
+            environment: {name: e.environment, needsConfirmation: e.needsConfirmation},
+            nextEnvironment: e.nextEnvironment,
+            app: e.apps[0],
+          }))
           .filter((r) => r.app))
         setError('')
       })
@@ -57,6 +77,22 @@ function AppEnvironmentsTable({appId}: Props) {
   useEffect(() => {
     loadEnvironments()
   }, [loadEnvironments])
+
+  // start a build and say so, with a button to open it
+  async function handleRunBuild() {
+    try {
+      const buildId = await triggerBuild(appId)
+      if (buildId) {
+        toast.success(`Started build #${buildId} of ${appId}`, {
+          action: {label: 'View build', onClick: () => onViewBuild(buildId)},
+        })
+      } else {
+        toast.info(`Build of ${appId} queued, but the CI tool has not started it yet`)
+      }
+    } catch {
+      toast.error(`Could not start a build of ${appId}`)
+    }
+  }
 
   // keeps the current rows on screen while reloading
   async function handleRefresh() {
@@ -103,8 +139,8 @@ function AppEnvironmentsTable({appId}: Props) {
               {rows.map((row) => {
                 const {environment, nextEnvironment, app} = row
                 return (
-                  <TableRow key={environment}>
-                    <TableCell className="font-medium">{environment}</TableCell>
+                  <TableRow key={environment.name}>
+                    <TableCell className="font-medium">{environment.name}</TableCell>
                     {app.version === null ? (
                       <TableCell colSpan={4} className="text-muted-foreground">Not deployed</TableCell>
                     ) : (
@@ -119,23 +155,36 @@ function AppEnvironmentsTable({appId}: Props) {
                         </TableCell>
                       </>
                     )}
-                    {/* no promote from the last environment, or of a version that isn't there or can't be told */}
                     <TableCell>
-                      {nextEnvironment && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="size-8"
-                                    aria-label={`Actions for ${appId} in ${environment}`}>
-                              <MoreHorizontal/>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="size-8"
+                                  aria-label={`Actions for ${appId} in ${environment.name}`}>
+                            <MoreHorizontal/>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={handleRunBuild}>
+                            <Play/> Run build
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled={!configuredApp.release} onSelect={onReleaseClick}>
+                            <Tag/> Release
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled={!configuredApp.release} onSelect={() => setDeployingTo(environment)}>
+                            <Rocket/> Deploy
+                          </DropdownMenuItem>
+                          {/* no promote from the last environment, or of a version that isn't there or can't be told */}
+                          {nextEnvironment && (
                             <DropdownMenuItem disabled={!app.version} onSelect={() => setPromotingRow(row)}>
                               <ArrowUpRight/> Promote
                             </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+                          )}
+                          {/* nothing to roll back where the app doesn't run */}
+                          <DropdownMenuItem disabled={!app.version} onSelect={() => setRollingBack(environment)}>
+                            <Undo2/> Rollback
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 )
@@ -148,10 +197,20 @@ function AppEnvironmentsTable({appId}: Props) {
       {promotingRow?.app.version && promotingRow.nextEnvironment && (
         <PromoteDialog appId={appId} choices={[{
           version: promotingRow.app.version,
-          fromEnvironment: promotingRow.environment,
+          fromEnvironment: promotingRow.environment.name,
           toEnvironment: promotingRow.nextEnvironment,
         }]}
                        open onOpenChange={(open) => !open && setPromotingRow(null)} onPromoted={loadEnvironments}/>
+      )}
+
+      {deployingTo && (
+        <DeployDialog appId={appId} pickedEnvironment={deployingTo.name} environments={[deployingTo]}
+                      open onOpenChange={(open) => !open && setDeployingTo(null)} onDeployed={loadEnvironments}/>
+      )}
+
+      {rollingBack && (
+        <RollbackDialog appId={appId} environments={[rollingBack]}
+                        open onOpenChange={(open) => !open && setRollingBack(null)} onRolledBack={loadEnvironments}/>
       )}
     </Card>
   )

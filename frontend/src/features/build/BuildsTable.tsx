@@ -11,13 +11,14 @@ import StatusBadge from './StatusBadge'
 import BuildDetailsDialog from './BuildDetailsDialog'
 import TestCounts from './TestCounts'
 import {formatDuration} from '@/lib/format'
+import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
 
 type Props = {
   /** e.g. "sample-app" */
   appId: string
 }
 
-/** The builds of an app's pipeline, newest first, with a button to start a new one. */
+/** The builds of an app's pipeline, newest first, with a button to start a new one; updates itself while a build runs. */
 function BuildsTable({appId}: Props) {
   // null while loading
   const [data, setData] = useState<CiBuilds | null>(null)
@@ -40,7 +41,10 @@ function BuildsTable({appId}: Props) {
     loadBuilds()
   }, [loadBuilds])
 
-  // Keeps the current rows on screen while reloading
+  // load again while a build runs
+  usePollWhileRunning(data, !!data?.builds.some((build) => build.status === 'RUNNING'), loadBuilds)
+
+  // keeps the current rows on screen while reloading
   async function handleRefresh() {
     setRefreshing(true)
     await loadBuilds()
