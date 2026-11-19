@@ -1,18 +1,18 @@
-import {useCallback, useEffect, useState} from 'react'
-import {useSearchParams} from 'react-router'
-import {RefreshCw, X} from 'lucide-react'
-import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {Skeleton} from '@/components/ui/skeleton'
-import {getHistory, type AuditActionResult, type AuditEntry, type History} from '@/api/history'
+import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router'
+import { RefreshCw, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { getHistory, type AuditActionResult, type AuditEntry, type History } from '@/api/history'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
-import {formatActionType} from '@/lib/format'
-import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
+import { formatActionType } from '@/lib/format'
+import { usePollWhileRunning } from '@/hooks/use-poll-while-running'
 import AuditTable from './AuditTable'
 
-// The Select can't have an empty value, so "all" stands for "no filter"
+// the Select can't have an empty value
 const ALL = 'all'
 
 const filterKeys = ['target', 'actionType', 'username', 'actionResult'] as const
@@ -26,15 +26,15 @@ type FilterSelectProps = {
 }
 
 /** One filter dropdown, with "All ..." to turn it off */
-function FilterSelect({label, value, options, onChange}: FilterSelectProps) {
+function FilterSelect({ label, value, options, onChange }: FilterSelectProps) {
   return (
     <Select value={value ?? ALL} onValueChange={(v) => onChange(v === ALL ? undefined : v)}>
       <SelectTrigger className="w-48" aria-label={label}>
-        <SelectValue/>
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={ALL}>All {label.toLowerCase()}</SelectItem>
-        {/* The value in the address may not be in the log any more: keep it selectable so the dropdown shows it */}
+        {/* a value from the URL that's no longer in the log still shows */}
         {value && !options.some((o) => o.value === value) && <SelectItem value={value}>{value}</SelectItem>}
         {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
       </SelectContent>
@@ -42,18 +42,14 @@ function FilterSelect({label, value, options, onChange}: FilterSelectProps) {
   )
 }
 
-/**
- * Every action taken through the dashboard, on any app: who did what, to what, and when; updates itself while one of
- * their builds runs.
- * The filters are in the query (?target=sample-app&username=andy...), so a filtered view has its own link.
- */
+/** Every action taken through the dashboard, with filters in the URL; reloads while a build runs. */
 function HistoryPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   // null while loading
   const [history, setHistory] = useState<History | null>(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
-  // The build shown in the details modal, or null when it is closed
+  // the build shown in the details modal, or null when it's closed
   const [selected, setSelected] = useState<{ appId: string, buildId: string } | null>(null)
 
   const target = searchParams.get('target') ?? undefined
@@ -61,7 +57,7 @@ function HistoryPage() {
   const username = searchParams.get('username') ?? undefined
   const actionResult = (searchParams.get('actionResult') ?? undefined) as AuditActionResult | undefined
 
-  // Loads the whole (recent) log with its builds in one request; the filters only pick rows from it
+  // load the recent log; the filters only pick rows from it
   const loadHistory = useCallback(() => {
     return getHistory()
       .then((data) => {
@@ -92,7 +88,7 @@ function HistoryPage() {
     setSearchParams(next)
   }
 
-  // The values each dropdown can pick: the ones in the loaded log, sorted
+  // each dropdown's options, from the loaded log
   const entries = history?.entries.map((item) => item.entry)
   const distinct = (pick: (e: AuditEntry) => string) => [...new Set((entries ?? []).map(pick))].sort()
   const options = {
@@ -102,7 +98,7 @@ function HistoryPage() {
   }
 
   const filtered = filterKeys.some((key) => searchParams.has(key))
-  const shownEntries = history?.entries.filter(({entry: e}) =>
+  const shownEntries = history?.entries.filter(({ entry: e }) =>
     (!target || e.target === target)
     && (!actionType || e.actionType === actionType)
     && (!username || e.username === username)
@@ -116,20 +112,20 @@ function HistoryPage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <FilterSelect label="Targets" value={target}
-                      options={options.targets.map((t) => ({value: t, label: t}))}
-                      onChange={(v) => setFilter('target', v)}/>
+                      options={options.targets.map((t) => ({ value: t, label: t }))}
+                      onChange={(v) => setFilter('target', v)} />
         <FilterSelect label="Actions" value={actionType}
-                      options={options.actionTypes.map((a) => ({value: a, label: formatActionType(a)}))}
-                      onChange={(v) => setFilter('actionType', v)}/>
+                      options={options.actionTypes.map((a) => ({ value: a, label: formatActionType(a) }))}
+                      onChange={(v) => setFilter('actionType', v)} />
         <FilterSelect label="Users" value={username}
-                      options={options.usernames.map((u) => ({value: u, label: u}))}
-                      onChange={(v) => setFilter('username', v)}/>
+                      options={options.usernames.map((u) => ({ value: u, label: u }))}
+                      onChange={(v) => setFilter('username', v)} />
         <FilterSelect label="Results" value={actionResult}
-                      options={[{value: 'SUCCESS', label: 'Done'}, {value: 'FAILED', label: 'Failed'}]}
-                      onChange={(v) => setFilter('actionResult', v)}/>
+                      options={[{ value: 'SUCCESS', label: 'Done' }, { value: 'FAILED', label: 'Failed' }]}
+                      onChange={(v) => setFilter('actionResult', v)} />
         {filtered && (
           <Button variant="ghost" onClick={() => setSearchParams({})}>
-            <X/> Clear filters
+            <X /> Clear filters
           </Button>
         )}
       </div>
@@ -139,7 +135,7 @@ function HistoryPage() {
           <CardTitle className="text-lg">Actions</CardTitle>
           <CardAction>
             <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-              <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
+              <RefreshCw className={refreshing ? 'animate-spin' : undefined} />
               Refresh
             </Button>
           </CardAction>
@@ -152,7 +148,7 @@ function HistoryPage() {
             </Alert>
           ) : !shownEntries ? (
             <div className="space-y-2">
-              {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full"/>)}
+              {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
             </div>
           ) : shownEntries.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
@@ -161,12 +157,16 @@ function HistoryPage() {
           ) : (
             <>
               {history?.unavailable.includes('BUILDS') && (
-                <p className="mb-2 text-sm text-muted-foreground">The CI tool couldn't be reached, so build statuses are missing.</p>
+                <p className="mb-2 text-sm text-muted-foreground">The CI tool couldn't be reached, so build statuses are
+                  missing.</p>
               )}
               <AuditTable
                 entries={shownEntries}
                 showTarget
-                onOpenBuild={({entry}) => entry.buildId && setSelected({appId: entry.target, buildId: entry.buildId})}
+                onOpenBuild={({ entry }) => entry.buildId && setSelected({
+                  appId: entry.target,
+                  buildId: entry.buildId
+                })}
               />
             </>
           )}
@@ -174,7 +174,7 @@ function HistoryPage() {
       </Card>
 
       <BuildDetailsDialog appId={selected?.appId ?? ''} buildId={selected?.buildId ?? null}
-                          onClose={() => setSelected(null)}/>
+                          onClose={() => setSelected(null)} />
     </div>
   )
 }

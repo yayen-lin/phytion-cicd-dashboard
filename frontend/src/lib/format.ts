@@ -25,3 +25,10 @@ export function formatDuration(millis: number | null): string {
 export function formatRole(role: string): string {
   return role.charAt(0) + role.slice(1).toLowerCase()
 }
+
+/** When and by whom a deploy ran, e.g. "11/14/2026, 4:00 AM by andy"; "Unknown" without a date. */
+export function deployedLabel(deployedAt: string | null, deployedBy: string | null): string {
+  if (!deployedAt) return 'Unknown'
+  const date = new Date(deployedAt).toLocaleString()
+  return deployedBy ? `${date} by ${deployedBy}` : date
+}

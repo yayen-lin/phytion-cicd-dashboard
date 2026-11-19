@@ -1,13 +1,11 @@
-import {post} from './client'
+import { post } from './client'
 
 export type Role = 'VIEWER' | 'DEVELOPER' | 'ADMIN'
 
 export type User = {
   username: string
   role: Role
-  /** false once an admin deactivated the user */
   active: boolean
-  /** when the user was added, ISO time */
   createdAt: string
 }
 
@@ -21,7 +19,7 @@ export async function getMe(): Promise<User | null> {
 
 /** Returns true when the username and password are correct. */
 export async function login(username: string, password: string): Promise<boolean> {
-  const res = await post('/api/login', new URLSearchParams({username, password}))
+  const res = await post('/api/login', new URLSearchParams({ username, password }))
   if (res.status === 401) return false
   if (!res.ok) throw new Error(`POST /api/login failed: ${res.status}`)
   return true

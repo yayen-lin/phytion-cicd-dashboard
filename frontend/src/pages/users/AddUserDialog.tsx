@@ -1,7 +1,7 @@
-import {useState, type FormEvent} from 'react'
-import {Loader2, UserPlus} from 'lucide-react'
-import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Button} from '@/components/ui/button'
+import { useState, type SubmitEvent } from 'react'
+import { Loader2, UserPlus } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -9,14 +9,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {Input} from '@/components/ui/input'
-import {Label} from '@/components/ui/label'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import type {Role} from '@/api/auth'
-import {addUser, roles} from '@/api/users'
-import {formatRole} from '@/lib/format'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { Role } from '@/api/auth'
+import { addUser, roles } from '@/api/users'
+import { formatRole } from '@/lib/format'
 
-// the backend's limits
+// the backend's minimum
 const MIN_PASSWORD_LENGTH = 8
 
 type Props = {
@@ -25,8 +25,8 @@ type Props = {
   onAdded: () => void
 }
 
-/** The form: username, password and role. Mounted fresh on each open, so it starts empty. */
-function AddUserForm({onAdded}: Pick<Props, 'onAdded'>) {
+/** The add user form; mounted fresh on each open. */
+function AddUserForm({ onAdded }: Pick<Props, 'onAdded'>) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<Role>('VIEWER')
@@ -36,7 +36,7 @@ function AddUserForm({onAdded}: Pick<Props, 'onAdded'>) {
   const canAdd = username.trim() !== '' && password.length >= MIN_PASSWORD_LENGTH && !adding
 
   // add the user
-  async function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canAdd) return
     setAdding(true)
@@ -59,13 +59,13 @@ function AddUserForm({onAdded}: Pick<Props, 'onAdded'>) {
       <div className="space-y-2">
         <Label htmlFor="add-user-username">Username</Label>
         <Input id="add-user-username" autoComplete="off" spellCheck={false} value={username}
-               onChange={(e) => setUsername(e.target.value)} disabled={adding}/>
+               onChange={(e) => setUsername(e.target.value)} disabled={adding} />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="add-user-password">Password</Label>
         <Input id="add-user-password" type="password" autoComplete="new-password" value={password}
-               onChange={(e) => setPassword(e.target.value)} disabled={adding}/>
+               onChange={(e) => setPassword(e.target.value)} disabled={adding} />
         <p className="text-xs text-muted-foreground">At least {MIN_PASSWORD_LENGTH} characters</p>
       </div>
 
@@ -73,7 +73,7 @@ function AddUserForm({onAdded}: Pick<Props, 'onAdded'>) {
         <Label htmlFor="add-user-role">Role</Label>
         <Select value={role} onValueChange={(r) => setRole(r as Role)} disabled={adding}>
           <SelectTrigger id="add-user-role" className="w-full">
-            <SelectValue/>
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {roles.map((r) => <SelectItem key={r} value={r}>{formatRole(r)}</SelectItem>)}
@@ -90,7 +90,7 @@ function AddUserForm({onAdded}: Pick<Props, 'onAdded'>) {
 
       <DialogFooter>
         <Button type="submit" disabled={!canAdd}>
-          {adding ? <Loader2 className="animate-spin"/> : <UserPlus/>}
+          {adding ? <Loader2 className="animate-spin" /> : <UserPlus />}
           {adding ? 'Adding...' : 'Add user'}
         </Button>
       </DialogFooter>
@@ -99,12 +99,12 @@ function AddUserForm({onAdded}: Pick<Props, 'onAdded'>) {
 }
 
 /** Adds a user, then closes. */
-function AddUserDialog({open, onOpenChange, onAdded}: Props) {
+function AddUserDialog({ open, onOpenChange, onAdded }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {open && (
         <DialogContent className="sm:max-w-md">
-          <AddUserForm onAdded={onAdded}/>
+          <AddUserForm onAdded={onAdded} />
         </DialogContent>
       )}
     </Dialog>

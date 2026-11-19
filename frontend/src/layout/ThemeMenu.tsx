@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-/** Light / dark / follow the OS */
+/** Picks a light, dark or the OS's theme. */
 function ThemeMenu() {
   const { theme, setTheme } = useTheme()
   return (

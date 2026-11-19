@@ -4,8 +4,8 @@
    add explanation I didn't ask for.
 4. Code style:
    - Names say what a thing is or does, in plain full words. A method name says what goes in and what comes out.
-   - Doc comments: one short plain sentence on what it does, an example of input and output, and what it returns
-     when the input is bad.
+   - Doc comments: one short plain sentence on what it does, and what it returns when the input is bad, comments 
+     should be straightforward and high level and simple and short
    - Comment code in paragraphs: split a method into blocks of related lines with a blank line between them,
      and put a short lowercase comment above each block saying what it does.
    - Less repetition in comments.

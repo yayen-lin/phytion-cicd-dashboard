@@ -1,11 +1,7 @@
-import {useEffect} from 'react'
-import {getPollIntervalMillis} from '@/api/status'
+import { useEffect } from 'react'
+import { getPollIntervalMillis } from '@/api/status'
 
-/**
- * Loads a view again a few seconds after each load, while something in it is running
- * (dashboard.frontend.poll-interval).
- * Stops when nothing runs any more, when a load fails (data doesn't change), or when the view closes.
- */
+/** Reloads a view every poll interval while something in it runs; stops when a load fails. */
 export function usePollWhileRunning(data: unknown, running: boolean, load: () => unknown) {
   useEffect(() => {
     if (!running) return

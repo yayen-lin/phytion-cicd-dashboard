@@ -1,38 +1,36 @@
-import {useCallback, useEffect, useState} from 'react'
-import {Navigate} from 'react-router'
-import {toast} from 'sonner'
-import {MoreHorizontal, RefreshCw, Shield, UserCheck, UserPlus, Users, UserX} from 'lucide-react'
-import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Badge} from '@/components/ui/badge'
-import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
+import { useCallback, useEffect, useState } from 'react'
+import { Navigate } from 'react-router'
+import { toast } from 'sonner'
+import { MoreHorizontal, RefreshCw, Shield, UserCheck, UserPlus, Users, UserX } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {Skeleton} from '@/components/ui/skeleton'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import type {User} from '@/api/auth'
-import {changeActive, getUsers} from '@/api/users'
-import {usePermissions} from '@/auth/AuthContext'
-import {formatRole} from '@/lib/format'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import type { User } from '@/api/auth'
+import { changeActive, getUsers } from '@/api/users'
+import { usePermissions } from '@/auth/AuthContext'
+import { formatRole } from '@/lib/format'
 import AddUserDialog from './AddUserDialog'
 import ChangeRoleDialog from './ChangeRoleDialog'
 import DeactivateUserDialog from './DeactivateUserDialog'
 
-/**
- * Every dashboard user (/users), admin only: add one, change a role, deactivate or reactivate.
- */
+/** Every dashboard user, admin only: add, change role, deactivate or reactivate. */
 function UsersPage() {
-  const {isAdmin} = usePermissions()
+  const { isAdmin } = usePermissions()
   // null while loading
   const [users, setUsers] = useState<User[] | null>(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [adding, setAdding] = useState(false)
-  // the user whose Change role or Deactivate dialog is open, or null when it is closed
+  // the user whose dialog is open, or null when it's closed
   const [changingRole, setChangingRole] = useState<User | null>(null)
   const [deactivating, setDeactivating] = useState<User | null>(null)
 
@@ -67,12 +65,13 @@ function UsersPage() {
     }
   }
 
-  if (!isAdmin) return <Navigate to="/" replace/>
+  if (!isAdmin) return <Navigate to="/" replace />
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Users className="size-6"/>Users</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Users className="size-6" />Users
+        </h1>
       </div>
 
       <Card>
@@ -80,11 +79,11 @@ function UsersPage() {
           <CardTitle className="text-lg">Users</CardTitle>
           <CardAction className="flex gap-2">
             <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-              <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
+              <RefreshCw className={refreshing ? 'animate-spin' : undefined} />
               Refresh
             </Button>
             <Button onClick={() => setAdding(true)}>
-              <UserPlus/>
+              <UserPlus />
               Add user
             </Button>
           </CardAction>
@@ -97,7 +96,7 @@ function UsersPage() {
             </Alert>
           ) : !users ? (
             <div className="space-y-2">
-              {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full"/>)}
+              {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
             </div>
           ) : (
             <Table>
@@ -124,21 +123,22 @@ function UsersPage() {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${user.username}`}>
-                            <MoreHorizontal/>
+                          <Button variant="ghost" size="icon" className="size-8"
+                                  aria-label={`Actions for ${user.username}`}>
+                            <MoreHorizontal />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onSelect={() => setChangingRole(user)}>
-                            <Shield/> Change role
+                            <Shield /> Change role
                           </DropdownMenuItem>
                           {user.active ? (
                             <DropdownMenuItem variant="destructive" onSelect={() => setDeactivating(user)}>
-                              <UserX/> Deactivate
+                              <UserX /> Deactivate
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem onSelect={() => handleReactivate(user)}>
-                              <UserCheck/> Reactivate
+                              <UserCheck /> Reactivate
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
@@ -155,19 +155,19 @@ function UsersPage() {
       <AddUserDialog open={adding} onOpenChange={setAdding} onAdded={() => {
         setAdding(false)
         loadUsers()
-      }}/>
+      }} />
       {changingRole && (
         <ChangeRoleDialog user={changingRole} onOpenChange={(open) => !open && setChangingRole(null)} onChanged={() => {
           setChangingRole(null)
           loadUsers()
-        }}/>
+        }} />
       )}
       {deactivating && (
         <DeactivateUserDialog user={deactivating} onOpenChange={(open) => !open && setDeactivating(null)}
                               onDeactivated={() => {
                                 setDeactivating(null)
                                 loadUsers()
-                              }}/>
+                              }} />
       )}
     </div>
   )

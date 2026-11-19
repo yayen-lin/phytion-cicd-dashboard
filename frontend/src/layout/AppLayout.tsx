@@ -6,7 +6,7 @@ import PageBreadcrumb from './PageBreadcrumb'
 import ThemeMenu from './ThemeMenu'
 import UserMenu from './UserMenu'
 
-/** The frame around every page once logged in: the stage sidebar, and a top bar with the breadcrumb, theme and user menus. */
+/** The frame around every page: the sidebar and a top bar with the breadcrumb and menus. */
 function AppLayout() {
   return (
     <SidebarProvider>

@@ -1,37 +1,35 @@
-import {useCallback, useEffect, useState, type KeyboardEvent} from 'react'
-import {RefreshCw} from 'lucide-react'
-import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {Skeleton} from '@/components/ui/skeleton'
-import {getCommits, type BranchCommits, type CodeCommit} from '@/api/code'
-import CommitLink from './CommitLink'
-import {firstLine} from '@/lib/format'
+import { useCallback, useEffect, useState, type KeyboardEvent } from 'react'
+import { RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
+import { getCommits, type BranchCommits, type CodeCommit } from '@/api/code'
+import CommitLink from '@/components/CommitLink'
+import { firstLine } from '@/lib/format'
 
 type Props = {
-  /** e.g. "sample-app" */
   appId: string
-  /** The branch in the address, or null when there is none */
+  /** The branch in the URL, or null */
   branch: string | null
   onBranchChange: (branch: string) => void
-  /** When set, clicking a row calls it with that commit and the branch it's on; e.g. to release it */
+  /** Called with a clicked commit and its branch; rows aren't clickable without it */
   onCommitClick?: (commit: CodeCommit, branch: string) => void
 }
 
-/** The most recent commits on one branch of an app's repo, newest first, with a branch selector; one request per branch. */
-function CommitsTable({appId, branch, onBranchChange, onCommitClick}: Props) {
-  // which branch was asked for, so switching branches shows the skeleton instead of the old branch's commits
+/** The latest commits on one branch, with a branch picker. */
+function CommitsTable({ appId, branch, onBranchChange, onCommitClick }: Props) {
+  // which branch was loaded, so switching branches shows the skeleton
   const [loaded, setLoaded] = useState<{ asked: string | null, result: BranchCommits } | null>(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
 
-  // the branches with the asked branch's commits (main when none is asked or it's gone)
   const loadCommits = useCallback(() => {
     return getCommits(appId, branch)
       .then((result) => {
-        setLoaded({asked: branch, result})
+        setLoaded({ asked: branch, result })
         setError('')
       })
       .catch(() => setError('Could not load the commits from the code tool'))
@@ -41,14 +39,14 @@ function CommitsTable({appId, branch, onBranchChange, onCommitClick}: Props) {
     loadCommits()
   }, [loadCommits])
 
-  // Keeps the current rows on screen while reloading
+  // keeps the current rows on screen while reloading
   async function handleRefresh() {
     setRefreshing(true)
     await loadCommits()
     setRefreshing(false)
   }
 
-  // the branch list stays while another branch loads; the rows only show for the asked branch
+  // the branch list stays while another branch loads
   const current = loaded && loaded.asked === branch ? loaded.result : null
   const branches = loaded?.result.branches ?? null
   const selected = current ? current.branch : branch
@@ -62,7 +60,7 @@ function CommitsTable({appId, branch, onBranchChange, onCommitClick}: Props) {
           {branches && selected && (
             <Select value={selected} onValueChange={onBranchChange}>
               <SelectTrigger className="w-48" aria-label="Branch">
-                <SelectValue/>
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {branches.map((b) => <SelectItem key={b.name} value={b.name}>{b.name}</SelectItem>)}
@@ -70,7 +68,7 @@ function CommitsTable({appId, branch, onBranchChange, onCommitClick}: Props) {
             </Select>
           )}
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
+            <RefreshCw className={refreshing ? 'animate-spin' : undefined} />
             Refresh
           </Button>
         </CardAction>
@@ -85,7 +83,7 @@ function CommitsTable({appId, branch, onBranchChange, onCommitClick}: Props) {
           <p className="py-8 text-center text-sm text-muted-foreground">No branches yet.</p>
         ) : !shown ? (
           <div className="space-y-2">
-            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full"/>)}
+            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
           </div>
         ) : shown.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No commits yet.</p>
@@ -117,10 +115,12 @@ function CommitsTable({appId, branch, onBranchChange, onCommitClick}: Props) {
                   })}
                 >
                   {/* the link opens the code tool, not the row's action */}
-                  <TableCell onClick={(e) => e.stopPropagation()}><CommitLink commit={commit}/></TableCell>
-                  <TableCell className="max-w-md truncate" title={commit.message}>{firstLine(commit.message)}</TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}><CommitLink commit={commit} /></TableCell>
+                  <TableCell className="max-w-md truncate"
+                             title={commit.message}>{firstLine(commit.message)}</TableCell>
                   <TableCell>{commit.author ?? '-'}</TableCell>
-                  <TableCell className="text-muted-foreground">{new Date(commit.committedAt).toLocaleString()}</TableCell>
+                  <TableCell
+                    className="text-muted-foreground">{new Date(commit.committedAt).toLocaleString()}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

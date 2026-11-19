@@ -11,6 +11,14 @@ https://phytionassetmanagement.com
 - Tech side: sensors on vehicles and facilities collect data, and a data pipeline calculates how many credits were generated
 - (not sure) Credits get audited, so we need to know which version of the calculation code produced which credits
 
+### Current situation (as of 2026-11-19)
+- Phytion's team is two people: one writes the services (the data pipeline), the other installs the
+  hardware that generates the data (flow meters, GPS on trucks and cars, etc.)
+- The services are mostly built and wait for the hardware installation to finish
+- No QA or UAT people yet; may be needed later
+- No Jira or other planning tool yet
+- I'm building the dashboard so it's ready when they are
+
 ---
 
 ### Goal
@@ -98,6 +106,8 @@ Choices that hold for the whole dashboard, with why. Words are defined in GLOSSA
 - Rollback deploys an older version through the deploy job, not `helm rollback` (which bounces between the
   last two versions). Its options come from the deploy job's history in Jenkins
 - Polling only while something runs, one request per view; webhooks wait until the dashboard runs on AWS
+- Three environments: `dev`, `staging`, `prod`. `qa` and `uat` are added when Phytion has QA or UAT people;
+  until then staging runs the integration tests and holds the manual approval
 
 ### Pipeline
 
@@ -149,7 +159,9 @@ Needed now:
 
 Needed later:
 - App language and frameworks (when setting up their repo's pipeline)
-- AWS services, environments (dev/staging/prod), who can deploy to prod (deploy stage)
+- AWS services, who can deploy to prod (deploy stage)
+- Runtime on AWS: EKS (Kubernetes run by AWS; keeps the Helm deploys and Kubernetes adapter) or plain EC2
+  (deploys, restarts and health checks built by us, one instance per environment)
 - How they version releases (release stage)
 - Monitoring tool (monitor stage)
 - Planning tool, e.g. Jira (plan stage)
@@ -224,11 +236,37 @@ Step 3: Industry Standard
     to this: hidden and those check in the backend would still catch it right? if says a user uncheck the hidden 
     attribute in the vss on the dashboard website)
   - Later: change your own password, admin resets a password
-- [ ] 3.2 make it industry standard (i.e., adding QA, UAT, etc. and connect to the external tools ... basically a new 
-  plan)
-- [ ] 3.3 db setup and stuff, transaction protection, e.g., what if an op failed in the middle of something, etc.
-- [ ] 3.4 show status of everything, like cost of an instance so far this month, or status of the replica and the 
-  version the replica is running ... brainstorm a bit here ... since now we have a lot of tools integrated to the 
-  dashboard
+- [ ] 3.2 Safe actions: what happens when an action fails partway
+  - [ ] 3.2.1 Audit record written as `PENDING` before calling the tool, then set to `SUCCEEDED` or `FAILED`;
+        records stuck in `PENDING` (e.g. the backend restarted) are checked against the tool on startup
+  - [ ] 3.2.2 Deploy lock: one deploy, promote or rollback per app and environment at a time; the backend
+        refuses a second one while the first runs
+  - [ ] 3.2.3 Safe retries: clicking twice or retrying a request doesn't start the action twice
+- [ ] 3.3 Gates and approvals: each environment has a job and checks a version must pass before it moves on
+  - [ ] 3.3.1 Gates per environment in config: dev (unit tests and scans pass), staging (integration tests
+        pass, one manual approval), prod (an admin approves, not the person who released it)
+  - [ ] 3.3.2 Integration tests: a Jenkins job runs them against staging after each deploy there
+  - [ ] 3.3.3 Approvals: approve or reject a version in an environment, with a comment; recorded in the audit log
+  - [ ] 3.3.4 Each version shows its gates (passed, failed, waiting); Promote stays disabled until all pass
+- [ ] 3.4 Quality checks in the build: results attach to the version and show on the Release page
+  - [ ] 3.4.1 Code coverage (JaCoCo)
+  - [ ] 3.4.2 Static analysis (SonarQube)
+  - [ ] 3.4.3 Security scans of the image and its libraries (Trivy or OWASP Dependency-Check)
+  - [ ] 3.4.4 SBOM and image signing (cosign)
+- [ ] 3.5 Traceability: Jira ticket → commit → build → image → deploy → pipeline run → credits
+  - Waits for Phytion's data pipeline to run and a planning tool to be picked
+  - [ ] 3.5.1 Pipeline runs: which version ran, when, on which input, and which credits it produced
+  - [ ] 3.5.2 Planning tool: tickets linked to commits by their key in the commit message
+  - [ ] 3.5.3 Versions and audit records can't be edited or deleted
+- [ ] 3.6 DORA metrics from Jenkins, Kubernetes and the audit log: deploy frequency, time from commit to prod,
+      share of deploys that fail, time to recover
+- [ ] 3.7 Operate and monitor
+  - [ ] 3.7.1 Pods: status, restarts, and the version each replica runs
+  - [ ] 3.7.2 Batch apps (Job / CronJob): last run, next run, result; daemon apps: health and uptime
+  - [ ] 3.7.3 Datadog: alerts and error rate after each deploy, linked from the deploy (waits for Datadog)
+  - [ ] 3.7.4 AWS: instance status and cost this month (waits for AWS)
+- Later: canary and blue-green deploys, feature flags, GitOps (Argo CD), `qa` and `uat` environments when
+  Phytion has people to use them
+- [ ] add-ons: artifactories? managing them? a real app hosted on ec2 to simulate it?  
 
 

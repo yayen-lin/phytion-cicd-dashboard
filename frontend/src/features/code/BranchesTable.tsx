@@ -1,19 +1,19 @@
-import {useCallback, useEffect, useState} from 'react'
-import {ExternalLink, GitBranch, RefreshCw} from 'lucide-react'
-import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Skeleton} from '@/components/ui/skeleton'
-import {getBranches, type CodeBranch} from '@/api/code'
-import CommitLink from './CommitLink'
-import {firstLine} from '@/lib/format'
+import { useCallback, useEffect, useState } from 'react'
+import { ExternalLink, GitBranch, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
+import { getBranches, type CodeBranch } from '@/api/code'
+import CommitLink from '@/components/CommitLink'
+import { firstLine } from '@/lib/format'
 
 type Props = {
   appId: string
 }
 
-function BranchesTable({appId}: Props) {
+function BranchesTable({ appId }: Props) {
   // null while loading
   const [branches, setBranches] = useState<CodeBranch[] | null>(null)
   const [error, setError] = useState('')
@@ -32,7 +32,7 @@ function BranchesTable({appId}: Props) {
     loadBranches()
   }, [loadBranches])
 
-  // Keeps the current rows on screen while reloading
+  // keeps the current rows on screen while reloading
   async function handleRefresh() {
     setRefreshing(true)
     await loadBranches()
@@ -45,7 +45,7 @@ function BranchesTable({appId}: Props) {
         <CardTitle className="text-lg">Branches</CardTitle>
         <CardAction>
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
+            <RefreshCw className={refreshing ? 'animate-spin' : undefined} />
             Refresh
           </Button>
         </CardAction>
@@ -58,7 +58,7 @@ function BranchesTable({appId}: Props) {
           </Alert>
         ) : !branches ? (
           <div className="space-y-2">
-            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full"/>)}
+            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
           </div>
         ) : branches.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No branches yet.</p>
@@ -75,15 +75,16 @@ function BranchesTable({appId}: Props) {
               {branches.map((branch) => (
                 <TableRow key={branch.name}>
                   <TableCell className="font-medium">
-                    <a href={branch.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">
-                      <GitBranch className="size-3.5 text-muted-foreground"/>{branch.name}
-                      <ExternalLink className="size-3.5 text-muted-foreground"/>
+                    <a href={branch.url} target="_blank" rel="noreferrer"
+                       className="inline-flex items-center gap-1 hover:underline">
+                      <GitBranch className="size-3.5 text-muted-foreground" />{branch.name}
+                      <ExternalLink className="size-3.5 text-muted-foreground" />
                     </a>
                   </TableCell>
                   <TableCell>
                     {branch.latestCommit ? (
                       <span className="flex min-w-0 items-center gap-2">
-                        <CommitLink commit={branch.latestCommit}/>
+                        <CommitLink commit={branch.latestCommit} />
                         <span className="max-w-md truncate" title={branch.latestCommit.message}>
                           {firstLine(branch.latestCommit.message)}
                         </span>

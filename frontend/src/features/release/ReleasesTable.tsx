@@ -1,15 +1,15 @@
-import {useCallback, useEffect, useState} from 'react'
-import {RefreshCw, Tag} from 'lucide-react'
-import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Skeleton} from '@/components/ui/skeleton'
-import type {App} from '@/api/apps'
-import {getVersions, type ReleaseVersion} from '@/api/release'
+import { useCallback, useEffect, useState } from 'react'
+import { RefreshCw, Tag } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
+import type { App } from '@/api/apps'
+import { getVersions, type ReleaseVersion } from '@/api/release'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
-import CommitLink from '@/features/code/CommitLink'
-import {usePermissions} from '@/auth/AuthContext'
+import CommitLink from '@/components/CommitLink'
+import { usePermissions } from '@/auth/AuthContext'
 
 type Props = {
   /** An app that is released */
@@ -18,17 +18,14 @@ type Props = {
   onReleaseClick: () => void
 }
 
-/**
- * The releases of an app, highest version first. A version's build number opens that build's details, and its commit
- * links to the code tool.
- */
-function ReleasesTable({app, onReleaseClick}: Props) {
-  const {canAct} = usePermissions()
+/** An app's releases, highest version first. */
+function ReleasesTable({ app, onReleaseClick }: Props) {
+  const { canAct } = usePermissions()
   // null while loading
   const [versions, setVersions] = useState<ReleaseVersion[] | null>(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
-  // The id of the build shown in the details modal, or null when it is closed
+  // the build shown in the details modal, or null when it's closed
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const loadVersions = useCallback(() => {
@@ -44,7 +41,7 @@ function ReleasesTable({app, onReleaseClick}: Props) {
     loadVersions()
   }, [loadVersions])
 
-  // Keeps the current rows on screen while reloading
+  // keeps the current rows on screen while reloading
   async function handleRefresh() {
     setRefreshing(true)
     await loadVersions()
@@ -57,12 +54,12 @@ function ReleasesTable({app, onReleaseClick}: Props) {
         <CardTitle className="text-lg">Releases</CardTitle>
         <CardAction className="flex gap-2">
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
+            <RefreshCw className={refreshing ? 'animate-spin' : undefined} />
             Refresh
           </Button>
           {canAct && (
             <Button onClick={onReleaseClick}>
-              <Tag/>
+              <Tag />
               Release
             </Button>
           )}
@@ -76,7 +73,7 @@ function ReleasesTable({app, onReleaseClick}: Props) {
           </Alert>
         ) : !versions ? (
           <div className="space-y-2">
-            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full"/>)}
+            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
           </div>
         ) : versions.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
@@ -109,7 +106,7 @@ function ReleasesTable({app, onReleaseClick}: Props) {
                     ) : '-'}
                   </TableCell>
                   <TableCell>
-                    {v.commit && v.commitUrl ? <CommitLink commit={{hash: v.commit, url: v.commitUrl}}/> : '-'}
+                    {v.commit && v.commitUrl ? <CommitLink commit={{ hash: v.commit, url: v.commitUrl }} /> : '-'}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {v.createdAt ? new Date(v.createdAt).toLocaleString() : '-'}
@@ -120,7 +117,7 @@ function ReleasesTable({app, onReleaseClick}: Props) {
           </Table>
         )}
       </CardContent>
-      <BuildDetailsDialog appId={app.id} buildId={selectedId} onClose={() => setSelectedId(null)}/>
+      <BuildDetailsDialog appId={app.id} buildId={selectedId} onClose={() => setSelectedId(null)} />
     </Card>
   )
 }

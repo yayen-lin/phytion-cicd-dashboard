@@ -1,11 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type SubmitEvent } from 'react'
 import { ArrowRight, Loader2, Undo2 } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
- 
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -19,35 +18,30 @@ import type { Environment } from '@/api/environments'
 import { StartedDeployView, type StartedDeploy } from './DeployDialog'
 
 type Props = {
-  /** An app that is deployed, e.g. "sample-app" */
+  /** An app that is deployed */
   appId: string
-  /** The environments it can roll back, in order; the first is picked, and a picker shows when there are more.
-   * One that needs confirmation asks to type its name */
+  /** The environments it can roll back, in order; a picker shows when there's more than one */
   environments: Environment[]
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** After the deploy job was started, and again when its build finished, e.g. to reload what runs where */
+  /** After the deploy starts and again when its build finishes */
   onRolledBack?: () => void
 }
 
-/**
- * The form: the version to go back to (the previous good one picked), what goes back where, and the environment's name
- * typed when it needs confirmation.
- */
+/** The rollback form: the version to go back to, and the environment's name typed when it needs confirmation. */
 function RollbackForm({ appId, environments, onStarted }: Pick<Props, 'appId' | 'environments'> & {
   onStarted: (started: StartedDeploy) => void
 }) {
   const [environmentName, setEnvironmentName] = useState(environments[0]?.name ?? '')
-  // the options and which environment they're for, so switching environments shows loading instead of the old ones
   const [loaded, setLoaded] = useState<RollbackOptions | null>(null)
   const [loadError, setLoadError] = useState<{ environment: string, message: string } | null>(null)
-  // the version picked by hand and in which environment; until then the previous good version is picked
+  // the version picked by hand; until then the previous good version
   const [picked, setPicked] = useState<{ environment: string, version: string } | null>(null)
   const [confirmation, setConfirmation] = useState('')
   const [rollingBack, setRollingBack] = useState(false)
   const [rollbackError, setRollbackError] = useState('')
 
-  // load the versions the picked environment can go to
+  // load the versions this environment can go back to
   useEffect(() => {
     getRollbackOptions(appId, environmentName)
       .then(setLoaded)
@@ -59,7 +53,7 @@ function RollbackForm({ appId, environments, onStarted }: Pick<Props, 'appId' | 
 
   const environment = environments.find((e) => e.name === environmentName)
   if (!environment) return null
-  // null while loading
+  // null while loading or after switching environments
   const options = loaded?.environment === environmentName ? loaded : null
   const shownLoadError = loadError?.environment === environmentName ? loadError.message : ''
   const version = (picked?.environment === environmentName ? picked.version : null) ?? options?.toVersions[0] ?? null
@@ -67,8 +61,8 @@ function RollbackForm({ appId, environments, onStarted }: Pick<Props, 'appId' | 
   const confirmed = !environment.needsConfirmation || confirmation === environment.name
   const canRollBack = !!version && confirmed && !rollingBack
 
-  // start the deploy job; the backend reads the deploy history again, so show the version it went to
-  async function handleSubmit(event: FormEvent) {
+  // start the deploy job; show the version the backend went to
+  async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!canRollBack || !version) return
     setRollingBack(true)
@@ -119,7 +113,6 @@ function RollbackForm({ appId, environments, onStarted }: Pick<Props, 'appId' | 
         </p>
       ) : (
         <>
-          {/* highest first; the first is the previous good version */}
           <div className="space-y-2">
             <Label htmlFor="rollback-version">Version</Label>
             <Select value={version} onValueChange={(v) => {
@@ -185,7 +178,7 @@ function RollbackForm({ appId, environments, onStarted }: Pick<Props, 'appId' | 
   )
 }
 
-/** Rolls an app in an environment back to an older version, then shows the started deploy build. */
+/** Rolls an app in an environment back to an older version, then shows the deploy build. */
 function RollbackDialog({ appId, environments, open, onOpenChange, onRolledBack }: Props) {
   // null until the deploy job was started
   const [started, setStarted] = useState<StartedDeploy | null>(null)

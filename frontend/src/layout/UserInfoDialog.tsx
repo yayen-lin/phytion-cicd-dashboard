@@ -1,5 +1,5 @@
-import type {ReactNode} from 'react'
-import {Badge} from '@/components/ui/badge'
+import type { ReactNode } from 'react'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -7,15 +7,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {useAuth} from '@/auth/AuthContext'
-import {formatRole} from '@/lib/format'
+import { useAuth } from '@/auth/AuthContext'
+import { formatRole } from '@/lib/format'
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-function Field({label, children}: { label: string, children: ReactNode }) {
+function Field({ label, children }: { label: string, children: ReactNode }) {
   return (
     <div className="grid grid-cols-[7rem_1fr] items-start gap-2 py-2">
       <dt className="text-sm text-muted-foreground">{label}</dt>
@@ -24,9 +24,9 @@ function Field({label, children}: { label: string, children: ReactNode }) {
   )
 }
 
-/** The logged-in user's details, read only. Uses the user already loaded at login, so it makes no request. */
-function UserInfoDialog({open, onOpenChange}: Props) {
-  const {user} = useAuth()
+/** The logged-in user's details, read only. */
+function UserInfoDialog({ open, onOpenChange }: Props) {
+  const { user } = useAuth()
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

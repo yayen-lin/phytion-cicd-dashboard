@@ -1,33 +1,32 @@
-import {useCallback, useEffect, useState} from 'react'
-import {toast} from 'sonner'
-import {GitBranch, Loader2, Play, RefreshCw} from 'lucide-react'
-import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Skeleton} from '@/components/ui/skeleton'
-import {getBuilds, triggerBuild, type CiBuilds} from '@/api/ci'
-import StatusBadge from './StatusBadge'
+import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { GitBranch, Loader2, Play, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
+import { getBuilds, triggerBuild, type CiBuilds } from '@/api/ci'
+import StatusBadge from '@/components/StatusBadge'
 import BuildDetailsDialog from './BuildDetailsDialog'
 import TestCounts from './TestCounts'
-import {formatDuration} from '@/lib/format'
-import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
-import {usePermissions} from '@/auth/AuthContext'
+import { formatDuration } from '@/lib/format'
+import { usePollWhileRunning } from '@/hooks/use-poll-while-running'
+import { usePermissions } from '@/auth/AuthContext'
 
 type Props = {
-  /** e.g. "sample-app" */
   appId: string
 }
 
-/** The builds of an app's pipeline, newest first, with a button to start a new one; updates itself while a build runs. */
-function BuildsTable({appId}: Props) {
-  const {canAct} = usePermissions()
+/** An app's builds, newest first, with a Run build button; reloads while a build runs. */
+function BuildsTable({ appId }: Props) {
+  const { canAct } = usePermissions()
   // null while loading
   const [data, setData] = useState<CiBuilds | null>(null)
   const [error, setError] = useState('')
   const [triggering, setTriggering] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  // The id of the build shown in the details modal, or null when it is closed
+  // the build shown in the details modal, or null when it's closed
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const loadBuilds = useCallback(() => {
@@ -73,12 +72,12 @@ function BuildsTable({appId}: Props) {
         <CardTitle className="text-lg">Builds</CardTitle>
         <CardAction className="flex gap-2">
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
+            <RefreshCw className={refreshing ? 'animate-spin' : undefined} />
             Refresh
           </Button>
           {canAct && (
             <Button onClick={handleRunBuild} disabled={triggering || !data}>
-              {triggering ? <Loader2 className="animate-spin"/> : <Play/>}
+              {triggering ? <Loader2 className="animate-spin" /> : <Play />}
               {triggering ? 'Starting...' : 'Run build'}
             </Button>
           )}
@@ -92,7 +91,7 @@ function BuildsTable({appId}: Props) {
           </Alert>
         ) : !data ? (
           <div className="space-y-2">
-            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full"/>)}
+            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
           </div>
         ) : data.builds.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No builds yet.</p>
@@ -125,23 +124,24 @@ function BuildsTable({appId}: Props) {
                   }}
                 >
                   <TableCell className="font-medium">#{build.id}</TableCell>
-                  <TableCell><StatusBadge status={build.status}/></TableCell>
+                  <TableCell><StatusBadge status={build.status} /></TableCell>
                   <TableCell>
-                    {build.tests ? <TestCounts counts={build.tests}/> : (
+                    {build.tests ? <TestCounts counts={build.tests} /> : (
                       <span className="text-sm text-muted-foreground">
                         {build.status === 'RUNNING' ? 'Running...' : 'No test results'}
                       </span>
                     )}
                   </TableCell>
                   <TableCell>
-                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs" title={build.commit ?? undefined}>
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs"
+                          title={build.commit ?? undefined}>
                       {build.commit?.slice(0, 7) ?? '-'}
                     </code>
                   </TableCell>
                   <TableCell>
                     {build.branch ? (
                       <span className="inline-flex items-center gap-1 text-muted-foreground">
-                        <GitBranch className="size-3.5"/>{build.branch}
+                        <GitBranch className="size-3.5" />{build.branch}
                       </span>
                     ) : '-'}
                   </TableCell>
@@ -155,7 +155,7 @@ function BuildsTable({appId}: Props) {
           </Table>
         )}
       </CardContent>
-      <BuildDetailsDialog appId={appId} buildId={selectedId} onClose={() => setSelectedId(null)}/>
+      <BuildDetailsDialog appId={appId} buildId={selectedId} onClose={() => setSelectedId(null)} />
     </Card>
   )
 }

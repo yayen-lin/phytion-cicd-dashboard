@@ -1,18 +1,18 @@
-import {useCallback, useEffect, useState} from 'react'
-import {ExternalLink, RefreshCw} from 'lucide-react'
-import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
-import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Skeleton} from '@/components/ui/skeleton'
-import {getDeployHistory, type DeployHistory} from '@/api/deploy'
-import StatusBadge from '@/features/build/StatusBadge'
-import CommitLink from '@/features/code/CommitLink'
-import {formatActionType, formatDuration} from '@/lib/format'
-import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
+import { useCallback, useEffect, useState } from 'react'
+import { ExternalLink, RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Skeleton } from '@/components/ui/skeleton'
+import { getDeployHistory, type DeployHistory } from '@/api/deploy'
+import StatusBadge from '@/components/StatusBadge'
+import CommitLink from '@/components/CommitLink'
+import { formatActionType, formatDuration } from '@/lib/format'
+import { usePollWhileRunning } from '@/hooks/use-poll-while-running'
 
-// the Select can't have an empty value, so "all" stands for every environment
+// the Select can't have an empty value
 const ALL = 'all'
 
 type Props = {
@@ -20,11 +20,8 @@ type Props = {
   appId: string
 }
 
-/**
- * An app's recent deploys to every environment, newest first, narrowed to one environment by the filter. Each row's
- * build links to the CI tool; updates itself while a deploy runs.
- */
-function DeploysTable({appId}: Props) {
+/** An app's recent deploys, newest first, with an environment filter; reloads while a deploy runs. */
+function DeploysTable({ appId }: Props) {
   // null while loading
   const [history, setHistory] = useState<DeployHistory | null>(null)
   const [error, setError] = useState('')
@@ -63,7 +60,7 @@ function DeploysTable({appId}: Props) {
         <CardAction className="flex gap-2">
           <Select value={environment} onValueChange={setEnvironment}>
             <SelectTrigger className="w-44" aria-label="Environment">
-              <SelectValue/>
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>All environments</SelectItem>
@@ -71,7 +68,7 @@ function DeploysTable({appId}: Props) {
             </SelectContent>
           </Select>
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
+            <RefreshCw className={refreshing ? 'animate-spin' : undefined} />
             Refresh
           </Button>
         </CardAction>
@@ -80,7 +77,8 @@ function DeploysTable({appId}: Props) {
         {history?.unavailable.includes('COMMITS') && (
           <Alert>
             <AlertTitle>Commits unavailable</AlertTitle>
-            <AlertDescription>The registry couldn't be reached, so the deploys show without their commits.</AlertDescription>
+            <AlertDescription>The registry couldn't be reached, so the deploys show without their
+              commits.</AlertDescription>
           </Alert>
         )}
 
@@ -91,7 +89,7 @@ function DeploysTable({appId}: Props) {
           </Alert>
         ) : !deploys ? (
           <div className="space-y-2">
-            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full"/>)}
+            {[0, 1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
           </div>
         ) : deploys.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
@@ -113,20 +111,22 @@ function DeploysTable({appId}: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {deploys.map(({run, commit, commitUrl}) => (
+              {deploys.map(({ run, commit, commitUrl }) => (
                 <TableRow key={run.build.id}>
                   <TableCell>
                     <a href={run.build.url} target="_blank" rel="noreferrer"
                        className="inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline">
-                      #{run.build.id} <ExternalLink className="size-3.5"/>
+                      #{run.build.id} <ExternalLink className="size-3.5" />
                     </a>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{new Date(run.build.startedAt).toLocaleString()}</TableCell>
+                  <TableCell
+                    className="text-muted-foreground">{new Date(run.build.startedAt).toLocaleString()}</TableCell>
                   <TableCell className="font-medium">{run.environment}</TableCell>
                   <TableCell className="font-mono text-sm">{run.version}</TableCell>
-                  <TableCell>{commit && commitUrl ? <CommitLink commit={{hash: commit, url: commitUrl}}/> : '-'}</TableCell>
+                  <TableCell>{commit && commitUrl ?
+                    <CommitLink commit={{ hash: commit, url: commitUrl }} /> : '-'}</TableCell>
                   <TableCell>{formatActionType(run.action)}</TableCell>
-                  <TableCell><StatusBadge status={run.build.status}/></TableCell>
+                  <TableCell><StatusBadge status={run.build.status} /></TableCell>
                   <TableCell>{run.deployedBy}</TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
                     {formatDuration(run.build.durationMillis)}

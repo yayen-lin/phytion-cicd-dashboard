@@ -12,7 +12,7 @@ import {
 import { useAuth } from '@/auth/AuthContext'
 import UserInfoDialog from './UserInfoDialog'
 
-/** The logged-in user's name, with Account (their details) and Log out. */
+/** The logged-in user's name, with Account and Log out. */
 function UserMenu() {
   const { user, logout } = useAuth()
   const [showingAccount, setShowingAccount] = useState(false)

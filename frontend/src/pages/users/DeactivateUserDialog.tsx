@@ -1,27 +1,26 @@
-import {useState} from 'react'
-import {Loader2, UserX} from 'lucide-react'
-import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
-import {Button} from '@/components/ui/button'
+import { useState } from 'react'
+import { Loader2, UserX } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
- 
+
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import type {User} from '@/api/auth'
-import {changeActive} from '@/api/users'
+import type { User } from '@/api/auth'
+import { changeActive } from '@/api/users'
 
 type Props = {
-  /** the user to deactivate; the dialog is open while set */
   user: User
   onOpenChange: (open: boolean) => void
   onDeactivated: () => void
 }
 
-/** Asks before deactivating a user, who is logged out and can't log in until reactivated. */
-function DeactivateUserDialog({user, onOpenChange, onDeactivated}: Props) {
+/** Asks before deactivating a user, which logs them out. */
+function DeactivateUserDialog({ user, onOpenChange, onDeactivated }: Props) {
   const [deactivating, setDeactivating] = useState(false)
   const [error, setError] = useState('')
 
@@ -54,7 +53,7 @@ function DeactivateUserDialog({user, onOpenChange, onDeactivated}: Props) {
 
         <DialogFooter>
           <Button variant="destructive" onClick={handleDeactivate} disabled={deactivating}>
-            {deactivating ? <Loader2 className="animate-spin"/> : <UserX/>}
+            {deactivating ? <Loader2 className="animate-spin" /> : <UserX />}
             {deactivating ? 'Deactivating...' : 'Deactivate'}
           </Button>
         </DialogFooter>

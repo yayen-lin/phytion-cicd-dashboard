@@ -24,7 +24,6 @@ type MenuLinkProps = {
   isActive: boolean
 }
 
-/** One sidebar link, highlighted when its page is open */
 function MenuLink({ label, icon: Icon, path, isActive }: MenuLinkProps) {
   return (
     <SidebarMenuItem>
@@ -38,7 +37,7 @@ function MenuLink({ label, icon: Icon, path, isActive }: MenuLinkProps) {
   )
 }
 
-/** The left sidebar: logo, Overview and Apps, one link per configured environment, and Management (History, and Users for admins). */
+/** The left sidebar: Overview, Apps, a link per environment, History and Users. */
 function LeftMenuBar() {
   const { pathname } = useLocation()
   const { isAdmin } = usePermissions()
@@ -46,7 +45,7 @@ function LeftMenuBar() {
   const [environmentNames, setEnvironmentNames] = useState<string[] | null>(null)
   const [environmentsError, setEnvironmentsError] = useState(false)
 
-  // load the environments from the backend's config
+  // load the environments
   useEffect(() => {
     getConfiguredEnvironments()
       .then((environments) => setEnvironmentNames(environments.map((e) => e.name)))
@@ -74,7 +73,6 @@ function LeftMenuBar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {/* exact match: every path starts with "/" */}
               <MenuLink label="Overview" icon={LayoutDashboard} path="/" isActive={pathname === '/'} />
               <MenuLink label="Apps" icon={Boxes} path="/apps" isActive={pathname.startsWith('/apps')} />
             </SidebarMenu>

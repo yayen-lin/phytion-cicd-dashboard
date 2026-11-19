@@ -1,11 +1,11 @@
 import { Navigate, Route, Routes } from 'react-router'
 import AppLayout from '@/layout/AppLayout'
-import AppPage from '@/features/apps/AppPage'
-import AppsPage from '@/features/apps/AppsPage'
-import EnvironmentPage from '@/features/environments/EnvironmentPage'
-import HistoryPage from '@/features/history/HistoryPage'
-import OverviewPage from '@/features/overview/OverviewPage'
-import UsersPage from '@/features/users/UsersPage'
+import AppPage from '@/pages/app/AppPage'
+import AppsPage from '@/pages/apps/AppsPage'
+import EnvironmentPage from '@/pages/environment/EnvironmentPage'
+import HistoryPage from '@/pages/history/HistoryPage'
+import OverviewPage from '@/pages/overview/OverviewPage'
+import UsersPage from '@/pages/users/UsersPage'
 
 function App() {
   return (

@@ -1,8 +1,7 @@
-import {checkLogin} from './client'
-import type {CiBuild} from './ci'
-import type {EnvironmentApp} from './deploy'
-import type {Environment} from './environments'
-import type {ReleaseVersion} from './release'
+import { checkLogin } from './client'
+import type { CiBuild } from './ci'
+import type { Environment, EnvironmentApp } from './environments'
+import type { ReleaseVersion } from './release'
 
 export type App = {
   id: string
@@ -12,7 +11,7 @@ export type App = {
   deploy: { tool: string, job: string } | null
 }
 
-/** Returns one app's repo, pipeline, release and deploy, e.g. "sample-app" -> {id: "sample-app", ...}; null when unknown. */
+/** Returns an app's config; null when there's no such app. */
 export async function getApp(appId: string): Promise<App | null> {
   const res = await checkLogin(fetch(`/api/apps/${encodeURIComponent(appId)}`))
   if (res.status === 404) return null
@@ -20,19 +19,19 @@ export async function getApp(appId: string): Promise<App | null> {
   return res.json()
 }
 
-/** The parts of an app summary, each read from its own tool */
+/** The parts of an app summary, one per tool */
 export type AppSummaryPart = 'BUILD' | 'VERSION' | 'ENVIRONMENTS'
 
-/** One app at a glance. A part whose tool couldn't be reached is null (or empty) and listed in unavailable. */
+/** One app at a glance; a part whose tool is down is empty and listed in unavailable */
 export type AppSummary = {
   app: App
   latestBuild: CiBuild | null
-  latestVersion: ReleaseVersion | null // null when there's none, or the app isn't released
-  deployments: { environment: string, state: EnvironmentApp }[] // empty when the app isn't deployed
+  latestVersion: ReleaseVersion | null // null when not released yet
+  deployments: { environment: string, state: EnvironmentApp }[]
   unavailable: AppSummaryPart[]
 }
 
-/** Everything the Apps page shows: the environments, and one summary per app, in the config's order. */
+/** Returns the environments and a summary of every app. */
 export async function getAppsSummary(): Promise<{ environments: Environment[], apps: AppSummary[] }> {
   const res = await checkLogin(fetch('/api/apps/summary'))
   if (!res.ok) throw new Error(`GET /api/apps/summary failed: ${res.status}`)
@@ -52,17 +51,17 @@ export function toolIdToDisplayName(toolId: string): string {
   return displayNamesByToolId[toolId] ?? toolId
 }
 
-/** "Repo: andy-test-app/sample-app (Bitbucket)" */
+/** The app's repo and its tool, for a page header. */
 export function appToRepoLabel(app: App): string {
   return `Repo: ${app.repo.workspace}/${app.repo.name} (${toolIdToDisplayName(app.repo.tool)})`
 }
 
-/** "Pipeline: sample-app (Jenkins)" */
+/** The app's pipeline and its tool. */
 export function appToPipelineLabel(app: App): string {
   return `Pipeline: ${app.pipeline.job} (${toolIdToDisplayName(app.pipeline.tool)})`
 }
 
-/** "Image: sample-app (Docker Registry)"; empty when the app isn't released */
+/** The app's image and its tool; empty when not released. */
 export function appToImageLabel(app: App): string {
   return app.release ? `Image: ${app.release.image} (${toolIdToDisplayName(app.release.tool)})` : ''
 }
