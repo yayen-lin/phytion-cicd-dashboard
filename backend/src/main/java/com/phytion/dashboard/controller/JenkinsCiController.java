@@ -2,6 +2,7 @@ package com.phytion.dashboard.controller;
 
 import java.util.List;
 
+import com.phytion.dashboard.auth.ActionAccess;
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.service.JenkinsCiService;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class JenkinsCiController {
 
     private final JenkinsCiService ciService;
+    private final ActionAccess actionAccess;
 
     @GetMapping("/api/ci/builds")
     public BuildsResponse listBuilds(@RequestParam String appId) {
@@ -36,6 +38,7 @@ public class JenkinsCiController {
 
     @PostMapping("/api/ci/builds")
     public TriggerResponse triggerBuild(@RequestParam String appId, Authentication authentication) {
+        actionAccess.checkCanAct(authentication);
         return new TriggerResponse(ciService.triggerBuild(appId, authentication.getName()).orElse(null));
     }
 

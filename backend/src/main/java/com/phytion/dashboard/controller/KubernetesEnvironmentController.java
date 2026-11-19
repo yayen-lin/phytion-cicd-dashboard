@@ -27,9 +27,9 @@ public class KubernetesEnvironmentController {
         return new EnvironmentsResponse(environmentService.listEnvironments(environment, appId).stream()
                 .map(status -> new EnvironmentStatusResponse(status.environment(),
                         environmentsProperties.needsConfirmation(status.environment()),
+                        environmentsProperties.needsAdmin(status.environment()),
                         environmentsProperties.nextEnvironment(status.environment())
-                                .map(next -> new EnvironmentController.EnvironmentResponse(next,
-                                        environmentsProperties.needsConfirmation(next)))
+                                .map(next -> EnvironmentController.EnvironmentResponse.from(next, environmentsProperties))
                                 .orElse(null),
                         status.apps()))
                 .toList());
@@ -38,7 +38,7 @@ public class KubernetesEnvironmentController {
     public record EnvironmentsResponse(List<EnvironmentStatusResponse> environments) {
     }
 
-    public record EnvironmentStatusResponse(String environment, boolean needsConfirmation,
+    public record EnvironmentStatusResponse(String environment, boolean needsConfirmation, boolean needsAdmin,
                                             EnvironmentController.EnvironmentResponse nextEnvironment,
                                             List<EnvironmentApp> apps) {
     }

@@ -9,6 +9,7 @@ import type {App} from '@/api/apps'
 import {getVersions, type ReleaseVersion} from '@/api/release'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import CommitLink from '@/features/code/CommitLink'
+import {usePermissions} from '@/auth/AuthContext'
 
 type Props = {
   /** An app that is released */
@@ -22,6 +23,7 @@ type Props = {
  * links to the code tool.
  */
 function VersionsTable({app, onReleaseClick}: Props) {
+  const {canAct} = usePermissions()
   // null while loading
   const [versions, setVersions] = useState<ReleaseVersion[] | null>(null)
   const [error, setError] = useState('')
@@ -59,10 +61,12 @@ function VersionsTable({app, onReleaseClick}: Props) {
             <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
             Refresh
           </Button>
-          <Button onClick={onReleaseClick}>
-            <Tag/>
-            Release
-          </Button>
+          {canAct && (
+            <Button onClick={onReleaseClick}>
+              <Tag/>
+              Release
+            </Button>
+          )}
         </CardAction>
       </CardHeader>
       <CardContent>

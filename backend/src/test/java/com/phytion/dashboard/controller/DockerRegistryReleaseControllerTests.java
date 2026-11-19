@@ -34,7 +34,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 /**
  * Tests the HTTP side only (login, JSON, status codes), with a fake DockerRegistryReleaseService.
  */
-@SpringBootTest(properties = "DASHBOARD_USERS_FILE=src/test/resources/test-users.properties")
+@SpringBootTest
 @AutoConfigureMockMvc
 class DockerRegistryReleaseControllerTests {
 
@@ -137,13 +137,19 @@ class DockerRegistryReleaseControllerTests {
     }
 
     @Test
+    @WithMockUser(username = "viewer", roles = "VIEWER")
+    void releaseAsViewerGives403() throws Exception {
+        mvc.perform(postRelease(RELEASE).with(csrf())).andExpect(status().isForbidden());
+    }
+
+    @Test
     @WithMockUser
     void releaseNeedsCsrfToken() throws Exception {
         mvc.perform(postRelease(RELEASE)).andExpect(status().isForbidden());
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void releasePassesTheLoggedInUserAndReturnsTheBuildId() throws Exception {
         when(releaseService.release(APP, "v1.4.0", COMMIT, "andy")).thenReturn(Optional.of("12"));
 
@@ -155,7 +161,7 @@ class DockerRegistryReleaseControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void releaseWhoseBuildIsStillQueuedReturnsNullBuildId() throws Exception {
         when(releaseService.release(APP, "v1.4.0", COMMIT, "andy")).thenReturn(Optional.empty());
 
@@ -165,7 +171,7 @@ class DockerRegistryReleaseControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void badVersionGives400WithTheReason() throws Exception {
         when(releaseService.release(APP, "1.4", COMMIT, "andy"))
                 .thenThrow(new InvalidReleaseException("A version looks like v1.4.0, got: 1.4"));
@@ -176,7 +182,7 @@ class DockerRegistryReleaseControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void tagRefusedGives502WithTheReason() throws Exception {
         when(releaseService.release(APP, "v1.4.0", COMMIT, "andy"))
                 .thenThrow(new CodeToolException("Bitbucket refused the tag: Tag \"v1.4.0\" already exists"));
@@ -187,7 +193,7 @@ class DockerRegistryReleaseControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void buildThatDidNotStartGives502WithTheReason() throws Exception {
         String reason = "Tag v1.4.0 was created, but its build didn't start: Jenkins not reachable";
         when(releaseService.release(APP, "v1.4.0", COMMIT, "andy")).thenThrow(new CiToolException(reason));

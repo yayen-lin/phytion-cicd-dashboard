@@ -33,7 +33,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 /**
  * Tests the HTTP side only (login, JSON, status codes), with a fake JenkinsDeployService.
  */
-@SpringBootTest(properties = "DASHBOARD_USERS_FILE=src/test/resources/test-users.properties")
+@SpringBootTest
 @AutoConfigureMockMvc
 class JenkinsDeployControllerTests {
 
@@ -125,7 +125,7 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void deployPassesTheLoggedInUserAndReturnsTheBuildId() throws Exception {
         when(deployService.deploy(APP, "1.0.1", "staging", "andy")).thenReturn(Optional.of("3"));
 
@@ -138,7 +138,7 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void deployWhoseBuildIsStillQueuedReturnsNullBuildId() throws Exception {
         when(deployService.deploy(APP, "1.0.1", "staging", "andy")).thenReturn(Optional.empty());
 
@@ -156,7 +156,7 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void versionNotReleasedGives400WithTheReason() throws Exception {
         when(deployService.deploy(APP, "1.0.1", "staging", "andy"))
                 .thenThrow(new InvalidDeployException("sample-app has no released version 1.0.1"));
@@ -167,7 +167,7 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void unknownAppGives404WithTheReason() throws Exception {
         when(deployService.deploy(APP, "1.0.1", "staging", "andy")).thenThrow(new AppNotFoundException(APP));
 
@@ -177,7 +177,7 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void deployJobThatDidNotStartGives502WithTheReason() throws Exception {
         when(deployService.deploy(APP, "1.0.1", "staging", "andy"))
                 .thenThrow(new CiToolException("Jenkins not reachable"));
@@ -197,13 +197,55 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
+    @WithMockUser(username = "viewer", roles = "VIEWER")
+    void deployAsViewerGives403() throws Exception {
+        mvc.perform(postDeploy(DEPLOY).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("Your role can't run builds, releases or deploys"));
+    }
+
+    @Test
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
+    void deployToProdAsDeveloperGives403() throws Exception {
+        mvc.perform(postDeploy(DEPLOY.replace("staging", "prod")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("Only an admin can change prod"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin_andy", roles = "ADMIN")
+    void deployToProdAsAdminStartsTheDeploy() throws Exception {
+        when(deployService.deploy(APP, "1.0.1", "prod", "admin_andy")).thenReturn(Optional.of("5"));
+
+        mvc.perform(postDeploy(DEPLOY.replace("staging", "prod")).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.buildId").value("5"));
+    }
+
+    @Test
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
+    void promoteToProdAsDeveloperGives403() throws Exception {
+        mvc.perform(postPromote(PROMOTE.replace("dev", "staging")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("Only an admin can change prod"));
+    }
+
+    @Test
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
+    void rollbackInProdAsDeveloperGives403() throws Exception {
+        mvc.perform(postRollback(ROLLBACK.replace("staging", "prod")).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("Only an admin can change prod"));
+    }
+
+    @Test
     @WithMockUser
     void promoteNeedsCsrfToken() throws Exception {
         mvc.perform(postPromote(PROMOTE)).andExpect(status().isForbidden());
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void promotePassesTheLoggedInUserAndReturnsThePromotion() throws Exception {
         when(deployService.promote(APP, "dev", "andy"))
                 .thenReturn(new Promotion(APP, "1.0.1", "dev", "staging", "4"));
@@ -226,7 +268,7 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void promoteWithNothingRunningGives400WithTheReason() throws Exception {
         when(deployService.promote(APP, "dev", "andy"))
                 .thenThrow(new InvalidDeployException("sample-app has no version running in dev"));
@@ -237,7 +279,7 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void promoteWhenKubernetesIsDownGives502WithTheReason() throws Exception {
         when(deployService.promote(APP, "dev", "andy"))
                 .thenThrow(new OperateToolException("Kubernetes not reachable"));
@@ -263,7 +305,7 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void rollbackPassesTheLoggedInUserAndReturnsTheRollback() throws Exception {
         when(deployService.rollback(APP, "staging", "1.0.0", "andy"))
                 .thenReturn(new Rollback(APP, "staging", "1.0.2", "1.0.0", "7"));
@@ -289,7 +331,7 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void rollbackWithNothingOlderGives400WithTheReason() throws Exception {
         when(deployService.rollback(APP, "staging", "1.0.0", "andy")).thenThrow(
                 new InvalidDeployException("sample-app has no older version to roll back to in staging"));
@@ -300,7 +342,7 @@ class JenkinsDeployControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void rollbackWhenJenkinsIsDownGives502WithTheReason() throws Exception {
         when(deployService.rollback(APP, "staging", "1.0.0", "andy"))
                 .thenThrow(new CiToolException("Jenkins not reachable"));

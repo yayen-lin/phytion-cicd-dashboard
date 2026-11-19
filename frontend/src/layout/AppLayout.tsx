@@ -2,12 +2,11 @@ import { Outlet } from 'react-router'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import LeftMenuBar from './LeftMenuBar.tsx'
-import BackendStatus from './BackendStatus'
 import PageBreadcrumb from './PageBreadcrumb'
 import ThemeMenu from './ThemeMenu'
 import UserMenu from './UserMenu'
 
-/** The frame around every page once logged in: the stage sidebar, and a top bar with the breadcrumb, status, theme and user menus. */
+/** The frame around every page once logged in: the stage sidebar, and a top bar with the breadcrumb, theme and user menus. */
 function AppLayout() {
   return (
     <SidebarProvider>
@@ -18,7 +17,6 @@ function AppLayout() {
           <Separator orientation="vertical" className="mr-2 data-vertical:h-4" />
           <PageBreadcrumb />
           <div className="ml-auto flex items-center gap-1">
-            <BackendStatus />
             <ThemeMenu />
             <UserMenu />
           </div>

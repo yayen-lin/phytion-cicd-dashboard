@@ -24,7 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * Tests the HTTP side only (login, JSON, status codes), with a fake KubernetesEnvironmentService.
  */
-@SpringBootTest(properties = "DASHBOARD_USERS_FILE=src/test/resources/test-users.properties")
+@SpringBootTest
 @AutoConfigureMockMvc
 class KubernetesEnvironmentControllerTests {
 

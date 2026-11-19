@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react'
 import {Navigate, useNavigate, useParams, useSearchParams} from 'react-router'
+import {toast} from 'sonner'
 import {Boxes, GitBranch, GitCommitHorizontal, ListChecks, Server, Tag} from 'lucide-react'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
@@ -11,7 +12,7 @@ import BranchesTable from '@/features/code/BranchesTable'
 import CommitsTable from '@/features/code/CommitsTable'
 import ReleaseDialog, {type PickedCommit} from '@/features/release/ReleaseDialog'
 import VersionsTable from '@/features/release/VersionsTable'
-import {showReleaseStarted} from '@/features/release/releaseToast'
+import {usePermissions} from '@/auth/AuthContext'
 import AppEnvironmentsTable from './AppEnvironmentsTable'
 
 const tabs = ['branches', 'commits', 'builds', 'versions', 'environments'] as const
@@ -37,6 +38,7 @@ function AppPage() {
   const {appId, tab} = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const {canAct} = usePermissions()
   // which app was loaded (null when it isn't configured), so switching apps shows the skeleton instead of the old one
   const [loaded, setLoaded] = useState<{ appId: string, app: App | null } | null>(null)
   const [error, setError] = useState('')
@@ -69,7 +71,10 @@ function AppPage() {
 
   function handleReleased(version: string, buildId: string | null) {
     setRelease(null)
-    showReleaseStarted(version, buildId, setSelectedBuildId)
+
+    // show the tag build right away
+    if (buildId) setSelectedBuildId(buildId)
+    else toast.info(`Releasing ${version}: the build is queued, but the CI tool has not started it yet`)
   }
 
   return (
@@ -111,7 +116,7 @@ function AppPage() {
             {tab === 'commits' && (
               <CommitsTable key={app.id} appId={app.id} branch={branch}
                             onBranchChange={(nextBranch) => goTo('commits', nextBranch)}
-                            onCommitClick={app.release
+                            onCommitClick={app.release && canAct
                               ? (commit, commitBranch) => setRelease({pickedCommit: {commit, branch: commitBranch}})
                               : undefined}/>
             )}

@@ -161,7 +161,7 @@ _to discuss_
 
 ### Worklog
 
-Step 1:
+Step 1: Skeleton
 - [x] 1.1 Docker Desktop installed
 - [x] 1.2 Skeletons: backend (Spring Boot, `backend/`) and frontend (Vite React + TS, `frontend/`, proxies `/api` to :8080)
 - [x] 1.3 Jenkins in Docker on port 8081
@@ -179,7 +179,7 @@ Step 1:
       Adapters are named per tool (`JenkinsAdapter`, `BitbucketAdapter`); shared interfaces and
       profiles wait until a second tool shows the shape
 
-Step 2: test results, then release, deploy and operate.
+Step 2: test results, release, deploy and operate.
 
 - [x] 2.0 Test page: per-pipeline passed / failed / skipped counts and a build's failing tests, from
       Jenkins' test reports
@@ -210,6 +210,20 @@ Step 2: test results, then release, deploy and operate.
 
 Step 3: Industry Standard
 - [ ] 3.1 user management, db set up and stuff so we can track what will be helpful on the dashboard? 
+  - [x] 3.1.1 Postgres container in `jenkins/docker-compose.yml` (port 5432, with a volume); the backend switches
+        from H2 to Postgres, connection settings in `.env`
+  - [x] 3.1.2 Squash the H2 migrations into one Postgres `V1`; drop the old H2 data (`backend/data/`)
+  - [x] 3.1.3 `users` table: username, password hash (BCrypt), role, active, created time
+  - [x] 3.1.4 Login reads users from the database instead of `users.properties` (then removed); a deactivated
+        user can't log in
+  - [x] 3.1.5 Roles `VIEWER` (look only), `DEVELOPER` (build, release, deploy / promote / rollback outside prod),
+        `ADMIN` (everything, prod included, and users); the backend refuses actions the role doesn't allow
+  - [x] 3.1.6 Users API (admin only): list, add (username, password, role), change role, deactivate and
+        reactivate; each recorded in the audit log
+  - [x] 3.1.7 Users page (admin only); action buttons the user's role can't use are hidden (my question when get
+    to this: hidden and those check in the backend would still catch it right? if says a user uncheck the hidden 
+    attribute in the vss on the dashboard website)
+  - Later: change your own password, admin resets a password
 - [ ] 3.2 make it industry standard (i.e., adding QA, UAT, etc. and connect to the external tools ... basically a new 
   plan)
 - [ ] 3.3 db setup and stuff, transaction protection, e.g., what if an op failed in the middle of something, etc.

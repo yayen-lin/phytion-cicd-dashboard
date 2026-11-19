@@ -16,13 +16,13 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {getAppsSummary, type App, type AppSummary} from '@/api/apps'
 import {triggerBuild} from '@/api/ci'
 import type {Environment} from '@/api/environments'
+import {usePermissions} from '@/auth/AuthContext'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import StatusBadge from '@/features/build/StatusBadge'
 import DeployDialog from '@/features/deploy/DeployDialog'
 import PromoteDialog, {type PromoteChoice} from '@/features/deploy/PromoteDialog'
 import RollbackDialog from '@/features/deploy/RollbackDialog'
 import ReleaseDialog from '@/features/release/ReleaseDialog'
-import {showReleaseStarted} from '@/features/release/releaseToast'
 import {cn} from '@/lib/utils'
 import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
 
@@ -81,6 +81,7 @@ function rollbackEnvironments(summary: AppSummary, environments: Environment[]):
  */
 function AppsPage() {
   const navigate = useNavigate()
+  const {canAct, canActIn} = usePermissions()
   // null while loading
   const [summary, setSummary] = useState<{ environments: Environment[], apps: AppSummary[] } | null>(null)
   const [error, setError] = useState('')
@@ -138,7 +139,10 @@ function AppsPage() {
 
   function handleReleased(app: App, version: string, buildId: string | null) {
     setReleasing(null)
-    showReleaseStarted(version, buildId, (id) => setSelectedBuild({appId: app.id, buildId: id}))
+
+    // show the tag build right away
+    if (buildId) setSelectedBuild({appId: app.id, buildId})
+    else toast.info(`Releasing ${version}: the build is queued, but the CI tool has not started it yet`)
   }
 
   // a row opens its app's page, by click or by Enter / Space
@@ -191,7 +195,7 @@ function AppsPage() {
                   <TableHead>App</TableHead>
                   <TableHead>Latest build</TableHead>
                   {summary.environments.map((e) => <TableHead key={e.name}>{e.name}</TableHead>)}
-                  <TableHead className="w-10"><span className="sr-only">Actions</span></TableHead>
+                  {canAct && <TableHead className="w-10"><span className="sr-only">Actions</span></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -213,7 +217,7 @@ function AppsPage() {
                       <TableCell key={e.name}><EnvironmentCell summary={s} environment={e.name}/></TableCell>
                     ))}
                     {/* the menu's clicks stay in the menu instead of opening the app */}
-                    <TableCell onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                    {canAct && <TableCell onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${s.app.id}`}>
@@ -227,12 +231,13 @@ function AppsPage() {
                           <DropdownMenuItem disabled={!s.app.release} onSelect={() => setReleasing(s.app)}>
                             <Tag/> Release
                           </DropdownMenuItem>
-                          <DropdownMenuItem disabled={!s.app.release || !s.app.deploy} onSelect={() => setDeploying(s.app)}>
+                          <DropdownMenuItem disabled={!s.app.release || !s.app.deploy || !summary.environments.some(canActIn)}
+                                            onSelect={() => setDeploying(s.app)}>
                             <Rocket/> Deploy
                           </DropdownMenuItem>
                           {/* disabled when nothing runs in any environment but the last */}
                           {(() => {
-                            const choices = promoteChoices(s, summary.environments)
+                            const choices = promoteChoices(s, summary.environments).filter((c) => canActIn(c.toEnvironment))
                             return (
                               <DropdownMenuItem disabled={choices.length === 0}
                                                 onSelect={() => setPromoting({appId: s.app.id, choices})}>
@@ -242,7 +247,7 @@ function AppsPage() {
                           })()}
                           {/* disabled when nothing runs in any environment */}
                           {(() => {
-                            const environments = rollbackEnvironments(s, summary.environments)
+                            const environments = rollbackEnvironments(s, summary.environments).filter(canActIn)
                             return (
                               <DropdownMenuItem disabled={environments.length === 0}
                                                 onSelect={() => setRollingBack({appId: s.app.id, environments})}>
@@ -252,7 +257,7 @@ function AppsPage() {
                           })()}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
+                    </TableCell>}
                   </TableRow>
                 ))}
               </TableBody>
@@ -266,7 +271,7 @@ function AppsPage() {
                        onReleased={(version, buildId) => handleReleased(releasing, version, buildId)}/>
       )}
       {deploying && summary && (
-        <DeployDialog appId={deploying.id} environments={summary.environments} open
+        <DeployDialog appId={deploying.id} environments={summary.environments.filter(canActIn)} open
                       onOpenChange={(open) => !open && setDeploying(null)} onDeployed={loadSummary}/>
       )}
       {promoting && (

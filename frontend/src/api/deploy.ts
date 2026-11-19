@@ -20,6 +20,7 @@ export type EnvironmentApp = {
 export type EnvironmentStatus = {
   environment: string
   needsConfirmation: boolean // whether a deploy there must be confirmed by typing the name
+  needsAdmin: boolean // whether only an admin can deploy, promote or roll back there
   nextEnvironment: Environment | null // where a promote goes, e.g. staging -> prod; null for the last one
   apps: EnvironmentApp[]
 }

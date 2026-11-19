@@ -6,9 +6,12 @@ import com.phytion.dashboard.adapter.ci.CiToolException;
 import com.phytion.dashboard.adapter.code.CodeToolException;
 import com.phytion.dashboard.adapter.operate.OperateToolException;
 import com.phytion.dashboard.adapter.release.ReleaseToolException;
+import com.phytion.dashboard.auth.RoleNotAllowedException;
 import com.phytion.dashboard.service.AppNotFoundException;
 import com.phytion.dashboard.service.InvalidDeployException;
 import com.phytion.dashboard.service.InvalidReleaseException;
+import com.phytion.dashboard.service.InvalidUserChangeException;
+import com.phytion.dashboard.service.UserNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -62,6 +65,24 @@ public class ApiExceptionHandler {
     @ExceptionHandler(InvalidDeployException.class)
     public ResponseEntity<Map<String, String>> invalidDeploy(InvalidDeployException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+    }
+
+    // 400 when a user change is refused
+    @ExceptionHandler(InvalidUserChangeException.class)
+    public ResponseEntity<Map<String, String>> invalidUserChange(InvalidUserChangeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+    }
+
+    // 404 when asked about a user that doesn't exist
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Map<String, String>> userNotFound(UserNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+    }
+
+    // 403 when the user's role may not take the action
+    @ExceptionHandler(RoleNotAllowedException.class)
+    public ResponseEntity<Map<String, String>> roleNotAllowed(RoleNotAllowedException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
     }
 
     // 404 when asked about an app that isn't configured

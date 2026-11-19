@@ -5,6 +5,7 @@ import AppsPage from '@/features/apps/AppsPage'
 import EnvironmentPage from '@/features/environments/EnvironmentPage'
 import HistoryPage from '@/features/history/HistoryPage'
 import OverviewPage from '@/features/overview/OverviewPage'
+import UsersPage from '@/features/users/UsersPage'
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="apps/:appId" element={<Navigate to="commits" replace />} />
         <Route path="apps/:appId/:tab" element={<AppPage />} />
         <Route path="history" element={<HistoryPage />} />
+        <Route path="users" element={<UsersPage />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

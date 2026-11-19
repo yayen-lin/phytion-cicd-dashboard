@@ -21,11 +21,18 @@ public class AuditEntry {
 
     // action enums
     public enum ActionType {
+        // cicd
         BUILD,
         RELEASE,
         DEPLOY,
         PROMOTE,
-        ROLLBACK
+        ROLLBACK,
+
+        // user management
+        ADD_USER,
+        CHANGE_ROLE,
+        DEACTIVATE_USER,
+        REACTIVATE_USER
     }
 
     public enum ActionResult {

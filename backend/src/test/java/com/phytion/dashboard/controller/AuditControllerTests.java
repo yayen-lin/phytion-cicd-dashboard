@@ -23,7 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * Tests the audit log API all the way down to the (in-memory) database, so it also checks that the Flyway
  * migrations and the AuditEntry class match.
  */
-@SpringBootTest(properties = "DASHBOARD_USERS_FILE=src/test/resources/test-users.properties")
+@SpringBootTest
 @AutoConfigureMockMvc
 class AuditControllerTests {
 

@@ -22,19 +22,24 @@ export async function checkLogin(response: Promise<Response>): Promise<Response>
 
 /** POST with the CSRF token the backend asks for */
 export async function post(url: string, body?: URLSearchParams): Promise<Response> {
-  return sendPost(url, {}, body)
+  return send('POST', url, {}, body)
 }
 
 /** POST of a JSON body, with the CSRF token the backend asks for */
 export async function postJson(url: string, data: unknown): Promise<Response> {
-  return sendPost(url, {'Content-Type': 'application/json'}, JSON.stringify(data))
+  return send('POST', url, {'Content-Type': 'application/json'}, JSON.stringify(data))
 }
 
-async function sendPost(url: string, headers: Record<string, string>, body?: BodyInit): Promise<Response> {
+/** PUT of a JSON body, with the CSRF token the backend asks for */
+export async function putJson(url: string, data: unknown): Promise<Response> {
+  return send('PUT', url, {'Content-Type': 'application/json'}, JSON.stringify(data))
+}
+
+async function send(method: 'POST' | 'PUT', url: string, headers: Record<string, string>, body?: BodyInit): Promise<Response> {
   // The cookie is gone after logout; any GET makes the backend set a new one
   if (!csrfToken()) await fetch('/api/status')
   return fetch(url, {
-    method: 'POST',
+    method,
     headers: {...headers, 'X-XSRF-TOKEN': csrfToken() ?? ''},
     body,
   })

@@ -9,10 +9,12 @@ import org.springframework.validation.annotation.Validated;
 
 @Validated
 @ConfigurationProperties("dashboard")
-public record EnvironmentsProperties(@NotEmpty List<String> environments, List<String> confirmEnvironments) {
+public record EnvironmentsProperties(@NotEmpty List<String> environments, List<String> confirmEnvironments,
+                                     List<String> adminEnvironments) {
 
     public EnvironmentsProperties {
         confirmEnvironments = confirmEnvironments == null ? List.of() : confirmEnvironments;
+        adminEnvironments = adminEnvironments == null ? List.of() : adminEnvironments;
     }
 
     public boolean contains(String environment) {
@@ -21,6 +23,10 @@ public record EnvironmentsProperties(@NotEmpty List<String> environments, List<S
 
     public boolean needsConfirmation(String environment) {
         return confirmEnvironments.contains(environment);
+    }
+
+    public boolean needsAdmin(String environment) {
+        return adminEnvironments.contains(environment);
     }
 
     /**

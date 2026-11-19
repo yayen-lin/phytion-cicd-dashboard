@@ -37,7 +37,7 @@ class OverviewServiceTests {
     void setUp() {
         environmentService = mock(KubernetesEnvironmentService.class);
         overviewService = new OverviewService(environmentService,
-                new EnvironmentsProperties(List.of("dev", "prod"), List.of("prod")));
+                new EnvironmentsProperties(List.of("dev", "prod"), List.of("prod"), List.of("prod")));
 
         // dev runs both apps, sample-app (first in the config) healthy; prod runs nothing yet, one deploy running
         when(environmentService.listEnvironments(null, null)).thenReturn(List.of(

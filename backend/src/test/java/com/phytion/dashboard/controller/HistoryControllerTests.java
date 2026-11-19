@@ -23,7 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * Tests the history API with a faked service.
  */
-@SpringBootTest(properties = "DASHBOARD_USERS_FILE=src/test/resources/test-users.properties")
+@SpringBootTest
 @AutoConfigureMockMvc
 class HistoryControllerTests {
 

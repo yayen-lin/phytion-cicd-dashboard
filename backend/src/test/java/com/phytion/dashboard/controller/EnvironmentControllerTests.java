@@ -15,7 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * Tests the environments API against the real config, so it also checks how dashboard.environments and
  * dashboard.confirm-environments are read.
  */
-@SpringBootTest(properties = "DASHBOARD_USERS_FILE=src/test/resources/test-users.properties")
+@SpringBootTest
 @AutoConfigureMockMvc
 class EnvironmentControllerTests {
 
@@ -38,6 +38,8 @@ class EnvironmentControllerTests {
                 .andExpect(jsonPath("$[1].name").value("staging"))
                 .andExpect(jsonPath("$[1].needsConfirmation").value(true))
                 .andExpect(jsonPath("$[2].name").value("prod"))
-                .andExpect(jsonPath("$[2].needsConfirmation").value(true));
+                .andExpect(jsonPath("$[2].needsConfirmation").value(true))
+                .andExpect(jsonPath("$[1].needsAdmin").value(false))
+                .andExpect(jsonPath("$[2].needsAdmin").value(true));
     }
 }

@@ -67,7 +67,7 @@ class KubernetesEnvironmentServiceTests {
         apps.put(OTHER_APP, new AppsProperties.AppSettings(REPO, PIPELINE, IMAGE, DEPLOY_JOB));
         apps.put("undeployed-app", new AppsProperties.AppSettings(REPO, PIPELINE, IMAGE, null));
         environmentService = new KubernetesEnvironmentService(kubernetes, releases, deployService,
-                new AppService(new AppsProperties(apps)), new EnvironmentsProperties(List.of("dev", "staging", "prod"), List.of("prod")));
+                new AppService(new AppsProperties(apps)), new EnvironmentsProperties(List.of("dev", "staging", "prod"), List.of("prod"), List.of("prod")));
 
         // sample-app 1.0.1 runs in dev and staging; nothing in prod
         when(kubernetes.listWorkloads("dev")).thenReturn(List.of(new OperateWorkload(APP, "1.0.1", 1, 1)));

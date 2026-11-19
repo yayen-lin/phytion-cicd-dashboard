@@ -2,6 +2,7 @@ package com.phytion.dashboard.controller;
 
 import java.util.List;
 
+import com.phytion.dashboard.auth.ActionAccess;
 import com.phytion.dashboard.model.CodeBranch;
 import com.phytion.dashboard.model.CodeBranchCommits;
 import com.phytion.dashboard.model.CodeCommit;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DockerRegistryReleaseController {
 
     private final DockerRegistryReleaseService releaseService;
+    private final ActionAccess actionAccess;
 
     /**
      * @param appId the name of the app
@@ -55,6 +57,7 @@ public class DockerRegistryReleaseController {
      */
     @PostMapping("/api/release/versions")
     public ReleaseResponse release(@RequestBody @Valid ReleaseRequest request, Authentication authentication) {
+        actionAccess.checkCanAct(authentication);
         return new ReleaseResponse(request.appId(), request.version(), releaseService.release(request.appId(),
                 request.version(), request.commit(), authentication.getName()).orElse(null));
     }

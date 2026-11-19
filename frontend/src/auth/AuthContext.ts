@@ -16,3 +16,20 @@ export function useAuth(): Auth {
   if (!auth) throw new Error('useAuth must be used inside AuthProvider')
   return auth
 }
+
+/** What the logged-in user's role allows. The backend refuses the rest, so this only hides what would be refused. */
+export type Permissions = {
+  /** run builds and releases: DEVELOPER and ADMIN */
+  canAct: boolean
+  /** manage users: ADMIN */
+  isAdmin: boolean
+  /** deploy, promote or roll back to an environment: e.g. a DEVELOPER and prod -> false */
+  canActIn: (environment: { needsAdmin: boolean }) => boolean
+}
+
+export function usePermissions(): Permissions {
+  const {user} = useAuth()
+  const canAct = user.role !== 'VIEWER'
+  const isAdmin = user.role === 'ADMIN'
+  return {canAct, isAdmin, canActIn: (environment) => canAct && (isAdmin || !environment.needsAdmin)}
+}

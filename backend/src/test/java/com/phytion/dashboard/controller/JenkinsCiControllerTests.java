@@ -30,7 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * Tests the HTTP side only (login, CSRF, JSON, status codes), with a fake CiService.
  */
-@SpringBootTest(properties = "DASHBOARD_USERS_FILE=src/test/resources/test-users.properties")
+@SpringBootTest
 @AutoConfigureMockMvc
 class JenkinsCiControllerTests {
 
@@ -125,13 +125,20 @@ class JenkinsCiControllerTests {
     }
 
     @Test
+    @WithMockUser(username = "viewer", roles = "VIEWER")
+    void triggerBuildAsViewerGives403() throws Exception {
+        mvc.perform(post("/api/ci/builds").param("appId", "sample-app").with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @WithMockUser
     void triggerBuildNeedsCsrfToken() throws Exception {
         mvc.perform(post("/api/ci/builds").param("appId", "sample-app")).andExpect(status().isForbidden());
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void triggerBuildPassesTheLoggedInUserAndReturnsTheBuildId() throws Exception {
         when(ciService.triggerBuild("sample-app", "andy")).thenReturn(Optional.of("4"));
 
@@ -141,7 +148,7 @@ class JenkinsCiControllerTests {
     }
 
     @Test
-    @WithMockUser(username = "andy")
+    @WithMockUser(username = "andy", roles = "DEVELOPER")
     void triggerBuildStillQueuedReturnsNullBuildId() throws Exception {
         when(ciService.triggerBuild("sample-app", "andy")).thenReturn(Optional.empty());
 

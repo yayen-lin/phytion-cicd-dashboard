@@ -68,7 +68,7 @@ class JenkinsDeployServiceTests {
         audit = mock(AuditService.class);
         when(releases.hasVersion(APP, "1.0.1")).thenReturn(true);
         deployService = new JenkinsDeployService(jenkins, kubernetes, releases, audit, new AppService(APPS),
-                new EnvironmentsProperties(List.of("dev", "staging", "prod"), List.of("prod")));
+                new EnvironmentsProperties(List.of("dev", "staging", "prod"), List.of("prod"), List.of("prod")));
     }
 
     @Test

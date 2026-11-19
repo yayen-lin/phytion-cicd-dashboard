@@ -7,6 +7,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+
+import com.phytion.dashboard.model.DashboardUser;
+import com.phytion.dashboard.repository.DashboardUserRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,12 +20,27 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest(properties = "DASHBOARD_USERS_FILE=src/test/resources/test-users.properties")
+@SpringBootTest
 @AutoConfigureMockMvc
 class SecurityConfigTests {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private DashboardUserRepository userRepository;
+
+    // an active admin and a deactivated developer, both with password "test" ({noop} stores it as is, tests only)
+    @BeforeEach
+    void addUsers() {
+        userRepository.save(new DashboardUser("test", "{noop}test", DashboardUser.Role.ADMIN, true, Instant.now()));
+        userRepository.save(new DashboardUser("gone", "{noop}test", DashboardUser.Role.DEVELOPER, false, Instant.now()));
+    }
+
+    @AfterEach
+    void removeUsers() {
+        userRepository.deleteAll();
+    }
 
     @Test
     void statusIsPublicAndSetsCsrfCookie() throws Exception {
@@ -48,6 +69,18 @@ class SecurityConfigTests {
     }
 
     @Test
+    void unknownUserIsRejected() throws Exception {
+        mvc.perform(formLogin("/api/login").user("nobody").password("test"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void deactivatedUserIsRejected() throws Exception {
+        mvc.perform(formLogin("/api/login").user("gone").password("test"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void loginThenMeReturnsUser() throws Exception {
         MockHttpSession session = (MockHttpSession) mvc
                 .perform(formLogin("/api/login").user("test").password("test"))
@@ -57,7 +90,9 @@ class SecurityConfigTests {
         mvc.perform(get("/api/me").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("test"))
-                .andExpect(jsonPath("$.roles[0]").value("ROLE_ADMIN"));
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.active").value(true))
+                .andExpect(jsonPath("$.passwordHash").doesNotExist());
     }
 
     @Test

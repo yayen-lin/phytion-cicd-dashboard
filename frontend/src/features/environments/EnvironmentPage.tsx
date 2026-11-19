@@ -16,13 +16,13 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/c
 import {getEnvironments, type EnvironmentApp, type EnvironmentStatus} from '@/api/deploy'
 import {getApp, type App} from '@/api/apps'
 import {triggerBuild} from '@/api/ci'
+import {usePermissions} from '@/auth/AuthContext'
 import BuildDetailsDialog from '@/features/build/BuildDetailsDialog'
 import CommitLink from '@/features/code/CommitLink'
 import DeployDialog from '@/features/deploy/DeployDialog'
 import PromoteDialog from '@/features/deploy/PromoteDialog'
 import RollbackDialog from '@/features/deploy/RollbackDialog'
 import ReleaseDialog from '@/features/release/ReleaseDialog'
-import {showReleaseStarted} from '@/features/release/releaseToast'
 import HealthBadge from './HealthBadge'
 import {deployedLabel} from '@/features/deploy/deployedLabel'
 
@@ -34,6 +34,7 @@ import {deployedLabel} from '@/features/deploy/deployedLabel'
 function EnvironmentPage() {
   const {environment = ''} = useParams()
   const navigate = useNavigate()
+  const {canAct, canActIn} = usePermissions()
   // which environment the status is for, so switching environments shows the skeleton instead of the old one's apps
   const [loaded, setLoaded] = useState<{ environment: string, status: EnvironmentStatus } | null>(null)
   const [error, setError] = useState<{ environment: string, message: string } | null>(null)
@@ -98,7 +99,10 @@ function EnvironmentPage() {
 
   function handleReleased(app: App, version: string, buildId: string | null) {
     setReleasing(null)
-    showReleaseStarted(version, buildId, (id) => setSelectedBuild({appId: app.id, buildId: id}))
+
+    // show the tag build right away
+    if (buildId) setSelectedBuild({appId: app.id, buildId})
+    else toast.info(`Releasing ${version}: the build is queued, but the CI tool has not started it yet`)
   }
 
   // a row opens its app's page, by click or by Enter / Space
@@ -158,7 +162,7 @@ function EnvironmentPage() {
                   <TableHead>Health</TableHead>
                   <TableHead>Commit</TableHead>
                   <TableHead>Deployed</TableHead>
-                  <TableHead className="w-10"><span className="sr-only">Actions</span></TableHead>
+                  {canAct && <TableHead className="w-10"><span className="sr-only">Actions</span></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -178,7 +182,7 @@ function EnvironmentPage() {
                       {deployedLabel(app.deployedAt, app.deployedBy)}
                     </TableCell>
                     {/* the menu's clicks stay in the menu instead of opening the app */}
-                    <TableCell onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                    {canAct && <TableCell onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${app.appId}`}>
@@ -192,21 +196,25 @@ function EnvironmentPage() {
                           <DropdownMenuItem onSelect={() => openRelease(app.appId)}>
                             <Tag/> Release
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => setDeployingAppId(app.appId)}>
-                            <Rocket/> Deploy
-                          </DropdownMenuItem>
+                          {status && canActIn(status) && (
+                            <DropdownMenuItem onSelect={() => setDeployingAppId(app.appId)}>
+                              <Rocket/> Deploy
+                            </DropdownMenuItem>
+                          )}
                           {/* no promote from the last environment, or of a version that can't be told */}
-                          {status?.nextEnvironment && (
+                          {status?.nextEnvironment && canActIn(status.nextEnvironment) && (
                             <DropdownMenuItem disabled={!app.version} onSelect={() => setPromotingApp(app)}>
                               <ArrowUpRight/> Promote
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem onSelect={() => setRollingBackAppId(app.appId)}>
-                            <Undo2/> Rollback
-                          </DropdownMenuItem>
+                          {status && canActIn(status) && (
+                            <DropdownMenuItem onSelect={() => setRollingBackAppId(app.appId)}>
+                              <Undo2/> Rollback
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
+                    </TableCell>}
                   </TableRow>
                 ))}
               </TableBody>
@@ -222,7 +230,7 @@ function EnvironmentPage() {
 
       {deployingAppId && status && (
         <DeployDialog appId={deployingAppId} pickedEnvironment={environment}
-                      environments={[{name: environment, needsConfirmation: status.needsConfirmation}]}
+                      environments={[{name: environment, needsConfirmation: status.needsConfirmation, needsAdmin: status.needsAdmin}]}
                       open onOpenChange={(open) => !open && setDeployingAppId(null)} onDeployed={loadEnvironment}/>
       )}
 
@@ -234,7 +242,7 @@ function EnvironmentPage() {
 
       {rollingBackAppId && status && (
         <RollbackDialog appId={rollingBackAppId}
-                        environments={[{name: environment, needsConfirmation: status.needsConfirmation}]}
+                        environments={[{name: environment, needsConfirmation: status.needsConfirmation, needsAdmin: status.needsAdmin}]}
                         open onOpenChange={(open) => !open && setRollingBackAppId(null)} onRolledBack={loadEnvironment}/>
       )}
 

@@ -36,9 +36,6 @@ out/
 ### VS Code ###
 .vscode/
 
-### Dashboard users (password hashes) ###
-users.properties
-
 ### Local secrets (API tokens) ###
 .env
 

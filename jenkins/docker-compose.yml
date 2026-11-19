@@ -12,16 +12,29 @@ services:
     group_add:
       - "0"
 
-  # Where the Release stage pushes images, e.g. localhost:5001/sample-app:12-b383e44 (AWS ECR later).
-  # Port 5001 because macOS' AirPlay Receiver takes 5000
+  # Where the Release stage pushes images to
   registry:
     image: registry:2.8.3
     container_name: registry
     ports:
-      - "5001:5000"
+      - "5001:5000" # 5001 because macOS' AirPlay Receiver takes 5000
     volumes:
       - registry_data:/var/lib/registry # keeps the images when the container restarts
+
+  # The dashboard's database
+  postgres:
+    image: postgres:17.6
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    env_file: ../backend/.env
+    environment:
+      POSTGRES_DB: dashboard
+      POSTGRES_USER: dashboard
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
   jenkins_home:
   registry_data:
+  postgres_data:

@@ -20,3 +20,8 @@ export function formatDuration(millis: number | null): string {
   const seconds = Math.round(millis / 1000)
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
 }
+
+/** A role: "DEVELOPER" -> "Developer" */
+export function formatRole(role: string): string {
+  return role.charAt(0) + role.slice(1).toLowerCase()
+}

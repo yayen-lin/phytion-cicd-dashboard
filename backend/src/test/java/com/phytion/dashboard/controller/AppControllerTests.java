@@ -26,10 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * Tests the apps API against the real config, so it also checks how dashboard.apps is read. The summary's service
  * is faked.
  */
-@SpringBootTest(properties = {
-        "DASHBOARD_USERS_FILE=src/test/resources/test-users.properties",
-        "BITBUCKET_SAMPLE_APP_TOKEN=secret-token",
-})
+@SpringBootTest(properties = "BITBUCKET_SAMPLE_APP_TOKEN=secret-token")
 @AutoConfigureMockMvc
 class AppControllerTests {
 

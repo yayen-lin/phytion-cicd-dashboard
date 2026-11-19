@@ -1,5 +1,7 @@
 package com.phytion.dashboard.controller;
 
+import com.phytion.dashboard.auth.ActionAccess;
+import com.phytion.dashboard.config.EnvironmentsProperties;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.Promotion;
 import com.phytion.dashboard.model.Rollback;
@@ -25,12 +27,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class JenkinsDeployController {
 
     private final JenkinsDeployService deployService;
+    private final ActionAccess actionAccess;
+    private final EnvironmentsProperties environmentsProperties;
 
     /**
      * Starts the app's deploy job
      */
     @PostMapping("/api/deploy/deployments")
     public DeployResponse deploy(@RequestBody @Valid DeployRequest request, Authentication authentication) {
+        actionAccess.checkCanActIn(request.environment(), authentication);
         return new DeployResponse(request.appId(), request.version(), request.environment(),
                 deployService.deploy(request.appId(), request.version(), request.environment(),
                         authentication.getName()).orElse(null));
@@ -41,6 +46,11 @@ public class JenkinsDeployController {
      */
     @PostMapping("/api/deploy/promotions")
     public Promotion promote(@RequestBody @Valid PromoteRequest request, Authentication authentication) {
+        actionAccess.checkCanAct(authentication);
+        environmentsProperties.nextEnvironment(request.fromEnvironment())
+                .ifPresent(toEnvironment -> actionAccess.checkCanActIn(toEnvironment, authentication));
+
+        // promote
         return deployService.promote(request.appId(), request.fromEnvironment(), authentication.getName());
     }
 
@@ -49,6 +59,7 @@ public class JenkinsDeployController {
      */
     @PostMapping("/api/deploy/rollbacks")
     public Rollback rollback(@RequestBody @Valid RollbackRequest request, Authentication authentication) {
+        actionAccess.checkCanActIn(request.environment(), authentication);
         return deployService.rollback(request.appId(), request.environment(), request.version(),
                 authentication.getName());
     }

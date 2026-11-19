@@ -19,6 +19,7 @@ import type {Environment} from '@/api/environments'
 import CommitLink from '@/features/code/CommitLink'
 import HealthBadge from '@/features/environments/HealthBadge'
 import {deployedLabel} from '@/features/deploy/deployedLabel'
+import {usePermissions} from '@/auth/AuthContext'
 import DeployDialog from '@/features/deploy/DeployDialog'
 import PromoteDialog from '@/features/deploy/PromoteDialog'
 import RollbackDialog from '@/features/deploy/RollbackDialog'
@@ -48,6 +49,7 @@ type Row = {
  */
 function AppEnvironmentsTable({app: configuredApp, onReleaseClick, onViewBuild}: Props) {
   const appId = configuredApp.id
+  const {canAct, canActIn} = usePermissions()
   // null while loading
   const [rows, setRows] = useState<Row[] | null>(null)
   const [error, setError] = useState('')
@@ -64,7 +66,7 @@ function AppEnvironmentsTable({app: configuredApp, onReleaseClick, onViewBuild}:
         // one row per environment: the app is the only one in each
         setRows(environments
           .map((e) => ({
-            environment: {name: e.environment, needsConfirmation: e.needsConfirmation},
+            environment: {name: e.environment, needsConfirmation: e.needsConfirmation, needsAdmin: e.needsAdmin},
             nextEnvironment: e.nextEnvironment,
             app: e.apps[0],
           }))
@@ -132,7 +134,7 @@ function AppEnvironmentsTable({app: configuredApp, onReleaseClick, onViewBuild}:
                 <TableHead>Health</TableHead>
                 <TableHead>Commit</TableHead>
                 <TableHead>Deployed</TableHead>
-                <TableHead className="w-10"><span className="sr-only">Actions</span></TableHead>
+                {canAct && <TableHead className="w-10"><span className="sr-only">Actions</span></TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -155,7 +157,7 @@ function AppEnvironmentsTable({app: configuredApp, onReleaseClick, onViewBuild}:
                         </TableCell>
                       </>
                     )}
-                    <TableCell>
+                    {canAct && <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="size-8"
@@ -170,22 +172,26 @@ function AppEnvironmentsTable({app: configuredApp, onReleaseClick, onViewBuild}:
                           <DropdownMenuItem disabled={!configuredApp.release} onSelect={onReleaseClick}>
                             <Tag/> Release
                           </DropdownMenuItem>
-                          <DropdownMenuItem disabled={!configuredApp.release} onSelect={() => setDeployingTo(environment)}>
-                            <Rocket/> Deploy
-                          </DropdownMenuItem>
+                          {canActIn(environment) && (
+                            <DropdownMenuItem disabled={!configuredApp.release} onSelect={() => setDeployingTo(environment)}>
+                              <Rocket/> Deploy
+                            </DropdownMenuItem>
+                          )}
                           {/* no promote from the last environment, or of a version that isn't there or can't be told */}
-                          {nextEnvironment && (
+                          {nextEnvironment && canActIn(nextEnvironment) && (
                             <DropdownMenuItem disabled={!app.version} onSelect={() => setPromotingRow(row)}>
                               <ArrowUpRight/> Promote
                             </DropdownMenuItem>
                           )}
                           {/* nothing to roll back where the app doesn't run */}
-                          <DropdownMenuItem disabled={!app.version} onSelect={() => setRollingBack(environment)}>
-                            <Undo2/> Rollback
-                          </DropdownMenuItem>
+                          {canActIn(environment) && (
+                            <DropdownMenuItem disabled={!app.version} onSelect={() => setRollingBack(environment)}>
+                              <Undo2/> Rollback
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
+                    </TableCell>}
                   </TableRow>
                 )
               })}

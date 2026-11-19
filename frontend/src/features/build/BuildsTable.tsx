@@ -12,6 +12,7 @@ import BuildDetailsDialog from './BuildDetailsDialog'
 import TestCounts from './TestCounts'
 import {formatDuration} from '@/lib/format'
 import {usePollWhileRunning} from '@/hooks/use-poll-while-running'
+import {usePermissions} from '@/auth/AuthContext'
 
 type Props = {
   /** e.g. "sample-app" */
@@ -20,6 +21,7 @@ type Props = {
 
 /** The builds of an app's pipeline, newest first, with a button to start a new one; updates itself while a build runs. */
 function BuildsTable({appId}: Props) {
+  const {canAct} = usePermissions()
   // null while loading
   const [data, setData] = useState<CiBuilds | null>(null)
   const [error, setError] = useState('')
@@ -75,10 +77,12 @@ function BuildsTable({appId}: Props) {
             <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
             Refresh
           </Button>
-          <Button onClick={handleRunBuild} disabled={triggering || !data}>
-            {triggering ? <Loader2 className="animate-spin"/> : <Play/>}
-            {triggering ? 'Starting...' : 'Run build'}
-          </Button>
+          {canAct && (
+            <Button onClick={handleRunBuild} disabled={triggering || !data}>
+              {triggering ? <Loader2 className="animate-spin"/> : <Play/>}
+              {triggering ? 'Starting...' : 'Run build'}
+            </Button>
+          )}
         </CardAction>
       </CardHeader>
       <CardContent>

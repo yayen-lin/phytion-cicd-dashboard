@@ -15,6 +15,7 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar'
 import { getConfiguredEnvironments } from '@/api/environments'
+import { usePermissions } from '@/auth/AuthContext'
 
 type MenuLinkProps = {
   label: string
@@ -37,9 +38,10 @@ function MenuLink({ label, icon: Icon, path, isActive }: MenuLinkProps) {
   )
 }
 
-/** The left sidebar: logo, Overview and Apps, one link per configured environment, and Management (History, Users). */
+/** The left sidebar: logo, Overview and Apps, one link per configured environment, and Management (History, and Users for admins). */
 function LeftMenuBar() {
   const { pathname } = useLocation()
+  const { isAdmin } = usePermissions()
   // null while loading
   const [environmentNames, setEnvironmentNames] = useState<string[] | null>(null)
   const [environmentsError, setEnvironmentsError] = useState(false)
@@ -111,13 +113,9 @@ function LeftMenuBar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <MenuLink label="History" icon={History} path="/history" isActive={pathname.startsWith('/history')} />
-              {/* no Users page yet: users are in a file for now */}
-              <SidebarMenuItem>
-                <SidebarMenuButton disabled tooltip="Users">
-                  <Users />
-                  <span>Users</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
+              {isAdmin && (
+                <MenuLink label="Users" icon={Users} path="/users" isActive={pathname.startsWith('/users')} />
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

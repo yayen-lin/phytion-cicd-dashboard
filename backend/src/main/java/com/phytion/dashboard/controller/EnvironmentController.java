@@ -21,11 +21,17 @@ public class EnvironmentController {
         return EnvironmentResponse.listFrom(environments);
     }
 
-    public record EnvironmentResponse(String name, boolean needsConfirmation) {
+    /**
+     * @param needsAdmin whether only an admin can deploy, promote or roll back there
+     */
+    public record EnvironmentResponse(String name, boolean needsConfirmation, boolean needsAdmin) {
+
+        static EnvironmentResponse from(String name, EnvironmentsProperties environments) {
+            return new EnvironmentResponse(name, environments.needsConfirmation(name), environments.needsAdmin(name));
+        }
+
         static List<EnvironmentResponse> listFrom(EnvironmentsProperties environments) {
-            return environments.environments().stream()
-                    .map(name -> new EnvironmentResponse(name, environments.needsConfirmation(name)))
-                    .toList();
+            return environments.environments().stream().map(name -> from(name, environments)).toList();
         }
     }
 }

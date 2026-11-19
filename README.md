@@ -38,8 +38,9 @@ docker compose stop      # stop Jenkins
 docker compose start     # start it again
 docker compose logs -f   # watch Jenkins' output
 docker compose down      # remove the container
+docker compose down -v   # remove the container and the volume
 
-# kube control
+# kube control/.
 kubectl create namespace dev
 kubectl create namespace staging
 kubectl create namespace prod
