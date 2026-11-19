@@ -13,10 +13,9 @@ import java.time.Instant;
  * @param desiredPods   how many pods it should have
  * @param readyPods     how many of them are ready
  * @param healthy       whether every desired pod is ready (false when it's scaled to 0)
- * @param deployedAt    when the newest deploy build of this version here started
- *                      null when none of the recent deploy builds did it, or the CI tool couldn't be reached
- * @param deployedBy    the dashboard user, or the CI tool's user when started there (null when no user did)
- * @param deployBuildId that deploy build's id in the app's deploy job
+ * @param deployedAt    the newest deploy build of this version
+ * @param deployedBy    user who started the deploy
+ * @param deployBuildId the deploy build's id in the app's deploy job
  */
 public record EnvironmentApp(
         String appId,

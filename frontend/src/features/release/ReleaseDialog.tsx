@@ -5,7 +5,7 @@ import {Button} from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+ 
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -162,9 +162,6 @@ function ReleaseForm({app, pickedCommit, onReleased}: Pick<Props, 'app' | 'picke
     <form onSubmit={handleSubmit} className="space-y-5">
       <DialogHeader>
         <DialogTitle className="text-lg">Release {app.id}</DialogTitle>
-        <DialogDescription>
-          Tags a commit with the version and builds it. If its tests pass, the build pushes the image.
-        </DialogDescription>
       </DialogHeader>
 
       {pickedCommit ? (
@@ -240,7 +237,7 @@ function ReleaseDialog({app, open, onOpenChange, pickedCommit = null, onReleased
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {open && (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent aria-describedby={undefined} className="sm:max-w-lg">
           <ReleaseForm app={app} pickedCommit={pickedCommit} onReleased={onReleased}/>
         </DialogContent>
       )}

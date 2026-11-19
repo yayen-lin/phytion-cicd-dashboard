@@ -5,7 +5,7 @@ import {Button} from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+ 
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -46,11 +46,10 @@ function ChangeRoleDialog({user, onOpenChange, onChanged}: Props) {
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-md">
         <form onSubmit={handleSubmit} className="space-y-5">
           <DialogHeader>
             <DialogTitle className="text-lg">Change role of {user.username}</DialogTitle>
-            <DialogDescription>{user.username} is logged out when you save.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">

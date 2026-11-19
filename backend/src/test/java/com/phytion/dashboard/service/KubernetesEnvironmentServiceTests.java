@@ -22,6 +22,7 @@ import com.phytion.dashboard.adapter.operate.kubernetes.KubernetesAdapter;
 import com.phytion.dashboard.adapter.release.ReleaseToolException;
 import com.phytion.dashboard.config.AppsProperties;
 import com.phytion.dashboard.config.EnvironmentsProperties;
+import com.phytion.dashboard.model.AuditEntry;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.CodeRepo;
@@ -131,7 +132,8 @@ class KubernetesEnvironmentServiceTests {
     @Test
     void runningDeployBuildsAreListedUnderTheirEnvironment() {
         DeployRun running = new DeployRun(APP, "1.0.2", "prod", new CiBuild("6", CiBuild.Status.RUNNING, null, null,
-                DEPLOYED_AT, null, "http://localhost:8081/job/sample-app-deploy/6/", null), "andy");
+                DEPLOYED_AT, null, "http://localhost:8081/job/sample-app-deploy/6/", null), "andy",
+                AuditEntry.ActionType.DEPLOY);
         when(deployService.listDeploys(APP)).thenReturn(List.of(running, deployRun("3", "1.0.1", "dev", "andy")));
 
         List<EnvironmentStatus> environments = environmentService.listEnvironments(null, null);
@@ -153,7 +155,8 @@ class KubernetesEnvironmentServiceTests {
 
     private static DeployRun deployRun(String buildId, String version, String environment, String deployedBy) {
         return new DeployRun(APP, version, environment, new CiBuild(buildId, CiBuild.Status.SUCCESS, null, null,
-                DEPLOYED_AT, 1000L, "http://localhost:8081/job/sample-app-deploy/" + buildId + "/", null), deployedBy);
+                DEPLOYED_AT, 1000L, "http://localhost:8081/job/sample-app-deploy/" + buildId + "/", null), deployedBy,
+                AuditEntry.ActionType.DEPLOY);
     }
 
     @Test

@@ -2,7 +2,7 @@ import {useCallback, useEffect, useState} from 'react'
 import {toast} from 'sonner'
 import {ArrowUpRight, MoreHorizontal, Play, RefreshCw, Rocket, Tag, Undo2} from 'lucide-react'
 import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -107,7 +107,6 @@ function AppEnvironmentsTable({app: configuredApp, onReleaseClick, onViewBuild}:
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Environments</CardTitle>
-        <CardDescription>The version running in each environment</CardDescription>
         <CardAction>
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>

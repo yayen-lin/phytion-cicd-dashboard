@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState} from 'react'
 import {RefreshCw, Tag} from 'lucide-react'
 import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
@@ -19,10 +19,10 @@ type Props = {
 }
 
 /**
- * The released versions of an app, highest first. A version's build number opens that build's details, and its commit
+ * The releases of an app, highest version first. A version's build number opens that build's details, and its commit
  * links to the code tool.
  */
-function VersionsTable({app, onReleaseClick}: Props) {
+function ReleasesTable({app, onReleaseClick}: Props) {
   const {canAct} = usePermissions()
   // null while loading
   const [versions, setVersions] = useState<ReleaseVersion[] | null>(null)
@@ -37,7 +37,7 @@ function VersionsTable({app, onReleaseClick}: Props) {
         setVersions(data.versions)
         setError('')
       })
-      .catch(() => setError('Could not load versions from the registry'))
+      .catch(() => setError('Could not load releases from the registry'))
   }, [app.id])
 
   useEffect(() => {
@@ -54,8 +54,7 @@ function VersionsTable({app, onReleaseClick}: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Versions</CardTitle>
-        <CardDescription>Images in the registry, highest version first</CardDescription>
+        <CardTitle className="text-lg">Releases</CardTitle>
         <CardAction className="flex gap-2">
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>
@@ -72,7 +71,7 @@ function VersionsTable({app, onReleaseClick}: Props) {
       <CardContent>
         {error ? (
           <Alert variant="destructive">
-            <AlertTitle>Versions unavailable</AlertTitle>
+            <AlertTitle>Releases unavailable</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : !versions ? (
@@ -81,7 +80,7 @@ function VersionsTable({app, onReleaseClick}: Props) {
           </div>
         ) : versions.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            No versions yet. Release a commit to make one.
+            No releases yet. Release a commit to make one.
           </p>
         ) : (
           <Table>
@@ -126,4 +125,4 @@ function VersionsTable({app, onReleaseClick}: Props) {
   )
 }
 
-export default VersionsTable
+export default ReleasesTable

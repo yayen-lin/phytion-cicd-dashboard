@@ -7,8 +7,9 @@ package com.phytion.dashboard.model;
  * @param version     the version it deployed
  * @param environment where it deployed it
  * @param build       the deploy build, with its status and when it started
- * @param deployedBy  the dashboard user when started from the dashboard, else the CI tool's user (null when no user
- *                    started it)
+ * @param deployedBy  the dashboard user when started from the dashboard
+ * @param action      the action the user has taken
  */
-public record DeployRun(String appId, String version, String environment, CiBuild build, String deployedBy) {
+public record DeployRun(String appId, String version, String environment, CiBuild build, String deployedBy,
+                        AuditEntry.ActionType action) {
 }

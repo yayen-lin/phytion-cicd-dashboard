@@ -12,7 +12,7 @@ export type EnvironmentApp = {
   readyPods: number | null
   healthy: boolean | null // whether every desired pod is ready (false when scaled to 0)
   deployedAt: string | null // when the newest deploy build of this version here started, from the dashboard or the CI tool; null when none found
-  deployedBy: string | null // the dashboard user, or the CI tool's user when started there
+  deployedBy: string | null // who deployed it; null when no deploy build found
   deployBuildId: string | null // that deploy build in the app's deploy job
 }
 
@@ -122,5 +122,39 @@ export async function getDeployBuild(appId: string, buildId: string): Promise<Ci
   const res = await checkLogin(fetch(`/api/deploy/deployments/${encodeURIComponent(buildId)}?${new URLSearchParams({appId})}`))
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`GET /api/deploy/deployments/${buildId} failed: ${res.status}`)
+  return res.json()
+}
+
+/** One run of an app's deploy job, started from the dashboard or straight in the CI tool */
+export type DeployRun = {
+  appId: string
+  version: string
+  environment: string
+  build: CiBuild // the deploy build, with its status and when it started
+  deployedBy: string // who deployed it; the CI tool's name when no user did
+  action: 'DEPLOY' | 'PROMOTE' | 'ROLLBACK' // DEPLOY when started in the CI tool
+}
+
+/** An app's recent deploys to every environment */
+export type DeployHistory = {
+  appId: string
+  environments: string[] // the configured environments, in the config's order
+  deploys: {
+    run: DeployRun
+    commit: string | null // the full hash of the commit the version was built from; null when the release tool doesn't know it
+    commitUrl: string | null // that commit's page in the code tool
+  }[] // newest first
+  unavailable: 'COMMITS'[] // the parts whose tool couldn't be reached
+}
+
+/**
+ * Returns an app's recent deploys to every environment, newest first, read from the deploy job's history in Jenkins.
+ * "sample-app" -> {environments: ["dev", "staging", "prod"], deploys: [{run: {version: "1.0.1", environment:
+ * "prod", action: "PROMOTE", ...}, commit: "3f2a...", ...}], unavailable: []}
+ * Throws with the backend's reason when the CI tool can't be reached.
+ */
+export async function getDeployHistory(appId: string): Promise<DeployHistory> {
+  const res = await checkLogin(fetch(`/api/deploy/deployments?${new URLSearchParams({appId})}`))
+  if (!res.ok) throw new Error(await errorMessage(res))
   return res.json()
 }

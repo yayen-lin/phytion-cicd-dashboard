@@ -209,7 +209,7 @@ Step 2: test results, release, deploy and operate.
 - [x] 2.13 Links that open another site or tab end with an ↗ icon
 
 Step 3: Industry Standard
-- [ ] 3.1 user management, db set up and stuff so we can track what will be helpful on the dashboard? 
+- [x] 3.1 user management, db set up and stuff so we can track what will be helpful on the dashboard? 
   - [x] 3.1.1 Postgres container in `jenkins/docker-compose.yml` (port 5432, with a volume); the backend switches
         from H2 to Postgres, connection settings in `.env`
   - [x] 3.1.2 Squash the H2 migrations into one Postgres `V1`; drop the old H2 data (`backend/data/`)

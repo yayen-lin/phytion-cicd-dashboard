@@ -6,7 +6,7 @@ import {Button} from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+ 
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -86,7 +86,6 @@ function BuildDetails({appId, buildId}: { appId: string, buildId: string }) {
           <DialogTitle className="text-lg">Build #{buildId}</DialogTitle>
           {build && <StatusBadge status={build.status}/>}
         </div>
-        <DialogDescription className="font-mono">{appId}</DialogDescription>
       </DialogHeader>
 
       {error ? (
@@ -149,7 +148,7 @@ function BuildDetailsDialog({appId, buildId, onClose}: Props) {
   return (
     <Dialog open={buildId !== null} onOpenChange={(open) => !open && onClose()}>
       {buildId && (
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent aria-describedby={undefined} className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <BuildDetails key={buildId} appId={appId} buildId={buildId}/>
         </DialogContent>
       )}

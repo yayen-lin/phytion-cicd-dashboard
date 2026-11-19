@@ -1,9 +1,14 @@
 package com.phytion.dashboard.service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -19,17 +24,23 @@ import com.phytion.dashboard.model.AuditFilter;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.CiBuildDetails;
 import com.phytion.dashboard.model.CiParameterizedBuild;
+import com.phytion.dashboard.model.DeployHistory;
 import com.phytion.dashboard.model.DeployRun;
 import com.phytion.dashboard.model.OperateWorkload;
 import com.phytion.dashboard.model.Promotion;
+import com.phytion.dashboard.model.ReleaseVersion;
 import com.phytion.dashboard.model.Rollback;
 import com.phytion.dashboard.model.RollbackOptions;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class JenkinsDeployService {
+
+    private static final Logger log = LoggerFactory.getLogger(JenkinsDeployService.class);
 
     private final JenkinsAdapter jenkins;
     private final KubernetesAdapter kubernetes;
@@ -57,20 +68,68 @@ public class JenkinsDeployService {
         }
         List<CiParameterizedBuild> builds = jenkins.listParameterizedBuilds(app.deploy().job());
 
-        // who started each build from the dashboard
-        Map<String, String> dashboardUsers = Stream.of(AuditEntry.ActionType.DEPLOY, AuditEntry.ActionType.PROMOTE,
-                        AuditEntry.ActionType.ROLLBACK)
+        // the dashboard action that started each build
+        Map<String, AuditEntry> dashboardActions = Stream.of(AuditEntry.ActionType.DEPLOY,
+                        AuditEntry.ActionType.PROMOTE, AuditEntry.ActionType.ROLLBACK)
                 .flatMap(actionType -> audit.getRecentEntries(new AuditFilter(appId, actionType, null,
                         AuditEntry.ActionResult.SUCCESS, null, null, null)).stream())
                 .filter(entry -> entry.getBuildId() != null)
-                .collect(Collectors.toMap(AuditEntry::getBuildId, AuditEntry::getUsername, (newest, older) -> newest));
+                .collect(Collectors.toMap(AuditEntry::getBuildId, Function.identity(), (newest, older) -> newest));
 
         // keep the builds that say what they deployed where
         return builds.stream()
                 .filter(run -> run.parameters().containsKey(VERSION) && run.parameters().containsKey(ENVIRONMENT))
-                .map(run -> new DeployRun(appId, run.parameters().get(VERSION), run.parameters().get(ENVIRONMENT),
-                        run.build(), dashboardUsers.getOrDefault(run.build().id(), run.startedBy())))
+                .map(run -> {
+                    AuditEntry action = dashboardActions.get(run.build().id());
+                    return new DeployRun(appId, run.parameters().get(VERSION), run.parameters().get(ENVIRONMENT),
+                            run.build(), deployedBy(action, run, app),
+                            action != null ? action.getActionType() : AuditEntry.ActionType.DEPLOY);
+                })
                 .toList();
+    }
+
+    /**
+     * The app's recent deploys to every environment
+     *
+     * @param appId the name of the app
+     * @return the deploys history list of the app
+     * @throws AppNotFoundException when no configured app has that id, or the app isn't deployed
+     * @throws CiToolException      when the CI tool can't be reached
+     */
+    public DeployHistory listDeployHistory(String appId) {
+        List<DeployRun> deploys = listDeploys(appId);
+        App app = apps.getApp(appId);
+
+        // read the commit of each deployed version at the same time
+        Map<String, ReleaseVersion> versions = new HashMap<>();
+        boolean unavailable = false;
+        if (app.release() != null) {
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+                Map<String, CompletableFuture<Optional<ReleaseVersion>>> versionReads = deploys.stream()
+                        .map(DeployRun::version)
+                        .distinct()
+                        .collect(Collectors.toMap(Function.identity(), version -> CompletableFuture.supplyAsync(
+                                () -> releases.findVersion(appId, version), executor)));
+                for (Map.Entry<String, CompletableFuture<Optional<ReleaseVersion>>> read : versionReads.entrySet()) {
+                    ParallelCalls.await(read.getValue()).ifPresent(version -> versions.put(read.getKey(), version));
+                }
+            } catch (ReleaseToolException e) {
+                log.warn("Couldn't read the versions of {}", appId, e);
+                versions.clear();
+                unavailable = true;
+            }
+        }
+
+        // attach each deploy's commit
+        List<DeployHistory.Entry> entries = deploys.stream()
+                .map(run -> {
+                    ReleaseVersion version = versions.get(run.version());
+                    return new DeployHistory.Entry(run, version != null ? version.commit() : null,
+                            version != null ? version.commitUrl() : null);
+                })
+                .toList();
+        return new DeployHistory(appId, environments.environments(), entries,
+                unavailable ? List.of(DeployHistory.Part.COMMITS) : List.of());
     }
 
     /**
@@ -335,6 +394,16 @@ public class JenkinsDeployService {
                     auditMessage + ": " + e.getMessage(), environment, version);
             throw e;
         }
+    }
+
+    /**
+     * Who started a deploy build: the dashboard user, else the CI tool's user, else the CI tool.
+     */
+    private static String deployedBy(AuditEntry dashboardAction, CiParameterizedBuild run, App app) {
+        if (dashboardAction != null) {
+            return dashboardAction.getUsername();
+        }
+        return run.startedBy() != null ? run.startedBy() : app.deploy().tool();
     }
 
     /**

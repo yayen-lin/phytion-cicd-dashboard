@@ -2,7 +2,7 @@ import {useCallback, useEffect, useState} from 'react'
 import {useSearchParams} from 'react-router'
 import {RefreshCw, X} from 'lucide-react'
 import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
 import {Skeleton} from '@/components/ui/skeleton'
@@ -137,7 +137,6 @@ function HistoryPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Actions</CardTitle>
-          <CardDescription>The most recent first</CardDescription>
           <CardAction>
             <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
               <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>

@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState} from 'react'
 import {ExternalLink, GitBranch, RefreshCw} from 'lucide-react'
 import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
@@ -43,7 +43,6 @@ function BranchesTable({appId}: Props) {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Branches</CardTitle>
-        <CardDescription>Most recently committed to first</CardDescription>
         <CardAction>
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>

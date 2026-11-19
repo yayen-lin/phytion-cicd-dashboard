@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {Navigate, useNavigate, useParams, useSearchParams} from 'react-router'
 import {toast} from 'sonner'
-import {Boxes, GitBranch, GitCommitHorizontal, ListChecks, Server, Tag} from 'lucide-react'
+import {Boxes, GitBranch, GitCommitHorizontal, ListChecks, Rocket, Server, Tag} from 'lucide-react'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
 import {Tabs, TabsList, TabsTrigger} from '@/components/ui/tabs'
@@ -11,11 +11,12 @@ import BuildsTable from '@/features/build/BuildsTable'
 import BranchesTable from '@/features/code/BranchesTable'
 import CommitsTable from '@/features/code/CommitsTable'
 import ReleaseDialog, {type PickedCommit} from '@/features/release/ReleaseDialog'
-import VersionsTable from '@/features/release/VersionsTable'
+import ReleasesTable from '@/features/release/ReleasesTable'
+import DeploysTable from '@/features/deploy/DeploysTable'
 import {usePermissions} from '@/auth/AuthContext'
 import AppEnvironmentsTable from './AppEnvironmentsTable'
 
-const tabs = ['branches', 'commits', 'builds', 'versions', 'environments'] as const
+const tabs = ['branches', 'commits', 'builds', 'releases', 'deploys', 'environments'] as const
 type Tab = typeof tabs[number]
 
 /** What an app's tab shows when the app has no release or deploy configured */
@@ -30,7 +31,7 @@ function NotConfigured({part}: { part: 'release' | 'deploy' }) {
 }
 
 /**
- * One app's page: its branches, commits, builds (with tests), versions, and where it runs, in tabs.
+ * One app's page: its branches, commits, builds (with tests), releases, deploys, and where it runs, in tabs.
  * The tab is in the path (/apps/sample-app/commits), the branch in the query (?branch=main), so every view has its own
  * link.
  */
@@ -107,7 +108,8 @@ function AppPage() {
             <TabsTrigger value="branches"><GitBranch/> Branches</TabsTrigger>
             <TabsTrigger value="commits"><GitCommitHorizontal/> Commits</TabsTrigger>
             <TabsTrigger value="builds"><ListChecks/> Builds</TabsTrigger>
-            <TabsTrigger value="versions"><Tag/> Versions</TabsTrigger>
+            <TabsTrigger value="releases"><Tag/> Releases</TabsTrigger>
+            <TabsTrigger value="deploys"><Rocket/> Deploys</TabsTrigger>
             <TabsTrigger value="environments"><Server/> Environments</TabsTrigger>
           </TabsList>
           {/* key: switching apps starts the table fresh (empty, loading) instead of showing the old app's rows */}
@@ -121,7 +123,8 @@ function AppPage() {
                               : undefined}/>
             )}
             {tab === 'builds' && <BuildsTable key={app.id} appId={app.id}/>}
-            {tab === 'versions' && (app.release ? <VersionsTable key={app.id} app={app} onReleaseClick={() => setRelease({pickedCommit: null})}/> : <NotConfigured part="release"/>)}
+            {tab === 'releases' && (app.release ? <ReleasesTable key={app.id} app={app} onReleaseClick={() => setRelease({pickedCommit: null})}/> : <NotConfigured part="release"/>)}
+            {tab === 'deploys' && (app.deploy ? <DeploysTable key={app.id} appId={app.id}/> : <NotConfigured part="deploy"/>)}
             {tab === 'environments' && (app.deploy ? <AppEnvironmentsTable key={app.id} app={app}
                                                                                        onReleaseClick={() => setRelease({pickedCommit: null})}
                                                                                        onViewBuild={setSelectedBuildId}/> : <NotConfigured part="deploy"/>)}

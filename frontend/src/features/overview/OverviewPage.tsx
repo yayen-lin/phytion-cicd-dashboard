@@ -61,7 +61,7 @@ function EnvironmentCard({overview}: { overview: EnvironmentOverview }) {
           <a key={`${deploy.appId}-${deploy.buildId}`} href={deploy.url} target="_blank" rel="noreferrer"
              className="flex items-center gap-2 text-sm text-sky-700 hover:underline dark:text-sky-300">
             <Loader2 className="size-3.5 shrink-0 animate-spin"/>
-            <span className="truncate">Deploying {deploy.appId} {deploy.version}{deploy.startedBy ? ` by ${deploy.startedBy}` : ''}</span>
+            <span className="truncate">Deploying {deploy.appId} {deploy.version}{` by ${deploy.startedBy}`}</span>
             <ExternalLink className="size-3.5 shrink-0"/>
           </a>
         ))}

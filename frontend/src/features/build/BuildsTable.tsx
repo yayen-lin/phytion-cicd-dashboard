@@ -2,7 +2,7 @@ import {useCallback, useEffect, useState} from 'react'
 import {toast} from 'sonner'
 import {GitBranch, Loader2, Play, RefreshCw} from 'lucide-react'
 import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Skeleton} from '@/components/ui/skeleton'
@@ -71,7 +71,6 @@ function BuildsTable({appId}: Props) {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Builds</CardTitle>
-        <CardDescription>Recent builds and their tests, newest first</CardDescription>
         <CardAction className="flex gap-2">
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
             <RefreshCw className={refreshing ? 'animate-spin' : undefined}/>

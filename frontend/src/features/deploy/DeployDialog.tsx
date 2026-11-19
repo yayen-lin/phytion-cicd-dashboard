@@ -5,7 +5,7 @@ import {Button} from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+ 
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -87,7 +87,6 @@ function DeployForm({appId, environments, pickedEnvironment, onStarted}: Pick<Pr
     <form onSubmit={handleSubmit} className="space-y-5">
       <DialogHeader>
         <DialogTitle className="text-lg">Deploy {appId}</DialogTitle>
-        <DialogDescription>Starts the deploy job, which installs the version in the environment.</DialogDescription>
       </DialogHeader>
 
       <div className="space-y-2">
@@ -222,9 +221,6 @@ export function StartedDeployView({appId, started, onFinished}: {
           {inProgress && <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground"/>}
           {title}
         </DialogTitle>
-        <DialogDescription>
-          The deploy job waits for the new pods to be ready, so it fails if they don't start.
-        </DialogDescription>
       </DialogHeader>
 
       {!started.buildId ? (
@@ -261,7 +257,7 @@ function DeployDialog({appId, environments, pickedEnvironment = null, open, onOp
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {open && (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent aria-describedby={undefined} className="sm:max-w-lg">
           {started ? (
             <StartedDeployView appId={appId} started={started} onFinished={onDeployed}/>
           ) : (

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+ 
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -86,9 +86,6 @@ function RollbackForm({ appId, environments, onStarted }: Pick<Props, 'appId' | 
     <form onSubmit={handleSubmit} className="space-y-5">
       <DialogHeader>
         <DialogTitle className="text-lg">Roll back {appId}</DialogTitle>
-        <DialogDescription>
-          Starts the deploy job, which installs an older version that ran in {environment.name} before.
-        </DialogDescription>
       </DialogHeader>
 
       {environments.length > 1 && (
@@ -202,7 +199,7 @@ function RollbackDialog({ appId, environments, open, onOpenChange, onRolledBack 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {open && (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent aria-describedby={undefined} className="sm:max-w-lg">
           {started ? (
             <StartedDeployView appId={appId} started={started} onFinished={onRolledBack} />
           ) : (

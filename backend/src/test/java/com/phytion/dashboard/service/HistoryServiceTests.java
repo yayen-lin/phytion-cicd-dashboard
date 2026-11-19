@@ -61,7 +61,7 @@ class HistoryServiceTests {
         when(audit.getRecentEntries(any())).thenReturn(List.of(DEPLOY_3, BUILD_3));
         when(ci.listBuilds(APP)).thenReturn(List.of(PIPELINE_BUILD_3));
         when(deployService.listDeploys(APP)).thenReturn(List.of(
-                new DeployRun(APP, "1.0.1", "prod", DEPLOY_BUILD_3, "andy")));
+                new DeployRun(APP, "1.0.1", "prod", DEPLOY_BUILD_3, "andy", AuditEntry.ActionType.DEPLOY)));
     }
 
     private static CiBuild build(String id, CiBuild.Status status, String job) {

@@ -29,12 +29,14 @@ import com.phytion.dashboard.model.CiParameterizedBuild;
 import com.phytion.dashboard.model.CiPipeline;
 import com.phytion.dashboard.model.CodeRepo;
 import com.phytion.dashboard.model.DeployJob;
+import com.phytion.dashboard.model.DeployHistory;
 import com.phytion.dashboard.model.DeployRun;
 import com.phytion.dashboard.model.OperateWorkload;
 import com.phytion.dashboard.model.Promotion;
 import com.phytion.dashboard.model.Rollback;
 import com.phytion.dashboard.model.RollbackOptions;
 import com.phytion.dashboard.model.ReleaseImage;
+import com.phytion.dashboard.model.ReleaseVersion;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -89,8 +91,8 @@ class JenkinsDeployServiceTests {
                         AuditEntry.ActionResult.SUCCESS, "9", "1.0.1 to staging", "staging", "1.0.1")));
 
         assertThat(deployService.listDeploys(APP)).containsExactly(
-                new DeployRun(APP, "1.0.1", "staging", build9, "andy"),
-                new DeployRun(APP, "1.0.0", "dev", build8, "admin"));
+                new DeployRun(APP, "1.0.1", "staging", build9, "andy", AuditEntry.ActionType.DEPLOY),
+                new DeployRun(APP, "1.0.0", "dev", build8, "admin", AuditEntry.ActionType.DEPLOY));
     }
 
     @Test
@@ -104,7 +106,53 @@ class JenkinsDeployServiceTests {
                         AuditEntry.ActionResult.SUCCESS, "10", "1.0.1 from dev to staging", "staging", "1.0.1")));
 
         assertThat(deployService.listDeploys(APP)).containsExactly(
-                new DeployRun(APP, "1.0.1", "staging", build10, "sam"));
+                new DeployRun(APP, "1.0.1", "staging", build10, "sam", AuditEntry.ActionType.PROMOTE));
+    }
+
+    @Test
+    void deployHistoryHasEveryEnvironmentAndEachDeploysCommit() {
+        CiBuild build9 = deployBuild("9");
+        CiBuild build8 = deployBuild("8");
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                new CiParameterizedBuild(build9, STAGING_1_0_1, "admin"),
+                new CiParameterizedBuild(build8, Map.of("VERSION", "1.0.0", "ENVIRONMENT", "dev"), "admin")));
+        when(releases.findVersion(APP, "1.0.1")).thenReturn(Optional.of(
+                new ReleaseVersion("1.0.1", "12", "abc123", "https://bitbucket.org/commits/abc123", null)));
+        // an image that's gone from the registry has no commit
+        when(releases.findVersion(APP, "1.0.0")).thenReturn(Optional.empty());
+
+        DeployHistory history = deployService.listDeployHistory(APP);
+
+        assertThat(history.environments()).containsExactly("dev", "staging", "prod");
+        assertThat(history.deploys()).containsExactly(
+                new DeployHistory.Entry(new DeployRun(APP, "1.0.1", "staging", build9, "admin", AuditEntry.ActionType.DEPLOY), "abc123",
+                        "https://bitbucket.org/commits/abc123"),
+                new DeployHistory.Entry(new DeployRun(APP, "1.0.0", "dev", build8, "admin", AuditEntry.ActionType.DEPLOY), null, null));
+        assertThat(history.unavailable()).isEmpty();
+    }
+
+    @Test
+    void deployHistoryWhenTheRegistryCanNotBeReachedHasTheDeploysWithoutCommits() {
+        CiBuild build9 = deployBuild("9");
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                new CiParameterizedBuild(build9, STAGING_1_0_1, "admin")));
+        when(releases.findVersion(APP, "1.0.1")).thenThrow(new ReleaseToolException("registry not reachable"));
+
+        DeployHistory history = deployService.listDeployHistory(APP);
+
+        assertThat(history.deploys()).containsExactly(
+                new DeployHistory.Entry(new DeployRun(APP, "1.0.1", "staging", build9, "admin", AuditEntry.ActionType.DEPLOY), null, null));
+        assertThat(history.unavailable()).containsExactly(DeployHistory.Part.COMMITS);
+    }
+
+    @Test
+    void listDeploysNamesTheCiToolWhenNoUserStartedTheBuild() {
+        CiBuild build12 = deployBuild("12");
+        when(jenkins.listParameterizedBuilds(DEPLOY_JOB)).thenReturn(List.of(
+                new CiParameterizedBuild(build12, STAGING_1_0_1, null)));
+
+        assertThat(deployService.listDeploys(APP)).containsExactly(
+                new DeployRun(APP, "1.0.1", "staging", build12, "jenkins", AuditEntry.ActionType.DEPLOY));
     }
 
     @Test
@@ -424,7 +472,7 @@ class JenkinsDeployServiceTests {
                         AuditEntry.ActionResult.SUCCESS, "11", "1.0.2 to 1.0.1 in staging", "staging", "1.0.1")));
 
         assertThat(deployService.listDeploys(APP)).containsExactly(
-                new DeployRun(APP, "1.0.1", "staging", build11, "sam"));
+                new DeployRun(APP, "1.0.1", "staging", build11, "sam", AuditEntry.ActionType.ROLLBACK));
     }
 
     @Test

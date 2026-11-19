@@ -5,7 +5,7 @@ import {Button} from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+ 
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -73,9 +73,6 @@ function PromoteForm({appId, choices, onStarted}: Pick<Props, 'appId' | 'choices
     <form onSubmit={handleSubmit} className="space-y-5">
       <DialogHeader>
         <DialogTitle className="text-lg">Promote {appId}</DialogTitle>
-        <DialogDescription>
-          Starts the deploy job, which installs the version running in {fromEnvironment} in {toEnvironment.name}.
-        </DialogDescription>
       </DialogHeader>
 
       {choices.length > 1 && (
@@ -153,7 +150,7 @@ function PromoteDialog({appId, choices, open, onOpenChange, onPromoted}: Props) 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       {open && (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent aria-describedby={undefined} className="sm:max-w-lg">
           {started ? (
             <StartedDeployView appId={appId} started={started} onFinished={onPromoted}/>
           ) : (

@@ -28,7 +28,7 @@ public record EnvironmentOverview(
      * @param appId     the app being deployed
      * @param version   the version being deployed
      * @param startedAt when the deploy build started
-     * @param startedBy the dashboard user, or the CI tool's user when started there (null when no user did)
+     * @param startedBy the user who started the build
      * @param buildId   the deploy build's id
      * @param url       the deploy build's page in the CI tool
      */

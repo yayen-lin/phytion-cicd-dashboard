@@ -3,6 +3,7 @@ package com.phytion.dashboard.controller;
 import com.phytion.dashboard.auth.ActionAccess;
 import com.phytion.dashboard.config.EnvironmentsProperties;
 import com.phytion.dashboard.model.CiBuild;
+import com.phytion.dashboard.model.DeployHistory;
 import com.phytion.dashboard.model.Promotion;
 import com.phytion.dashboard.model.Rollback;
 import com.phytion.dashboard.model.RollbackOptions;
@@ -70,6 +71,14 @@ public class JenkinsDeployController {
     @GetMapping("/api/deploy/rollback-options")
     public RollbackOptions getRollbackOptions(@RequestParam String appId, @RequestParam String environment) {
         return deployService.listRollbackOptions(appId, environment);
+    }
+
+    /**
+     * The app's recent deploys to every environment.
+     */
+    @GetMapping("/api/deploy/deployments")
+    public DeployHistory getDeployHistory(@RequestParam String appId) {
+        return deployService.listDeployHistory(appId);
     }
 
     /**

@@ -5,7 +5,7 @@ import {Button} from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
+ 
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -40,12 +40,9 @@ function DeactivateUserDialog({user, onOpenChange, onDeactivated}: Props) {
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-lg">Deactivate {user.username}?</DialogTitle>
-          <DialogDescription>
-            {user.username} is logged out and can't log in until reactivated.
-          </DialogDescription>
         </DialogHeader>
 
         {error && (

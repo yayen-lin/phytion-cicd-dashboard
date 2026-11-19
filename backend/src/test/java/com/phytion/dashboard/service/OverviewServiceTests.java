@@ -9,6 +9,7 @@ import java.util.List;
 
 import com.phytion.dashboard.adapter.operate.OperateToolException;
 import com.phytion.dashboard.config.EnvironmentsProperties;
+import com.phytion.dashboard.model.AuditEntry;
 import com.phytion.dashboard.model.CiBuild;
 import com.phytion.dashboard.model.DeployRun;
 import com.phytion.dashboard.model.EnvironmentApp;
@@ -28,7 +29,7 @@ class OverviewServiceTests {
             false, null, null, null);
     private static final DeployRun RUNNING_TO_PROD = new DeployRun("sample-app", "1.0.2", "prod",
             new CiBuild("9", CiBuild.Status.RUNNING, null, null, Instant.parse("2026-11-14T12:00:00Z"), null,
-                    "http://localhost:8081/job/sample-app-deploy/9/", null), "andy");
+                    "http://localhost:8081/job/sample-app-deploy/9/", null), "andy", AuditEntry.ActionType.DEPLOY);
 
     private KubernetesEnvironmentService environmentService;
     private OverviewService overviewService;

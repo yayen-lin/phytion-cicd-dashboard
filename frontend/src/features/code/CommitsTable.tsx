@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useState, type KeyboardEvent} from 'react'
 import {RefreshCw} from 'lucide-react'
 import {Button} from '@/components/ui/button'
-import {Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle} from '@/components/ui/card'
+import {Card, CardAction, CardContent, CardHeader, CardTitle} from '@/components/ui/card'
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from '@/components/ui/table'
 import {Alert, AlertDescription, AlertTitle} from '@/components/ui/alert'
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from '@/components/ui/select'
@@ -58,9 +58,6 @@ function CommitsTable({appId, branch, onBranchChange, onCommitClick}: Props) {
     <Card>
       <CardHeader>
         <CardTitle className="text-lg">Commits</CardTitle>
-        <CardDescription>
-          Recent commits on a branch, newest first{onCommitClick && '. Click a commit to release it'}
-        </CardDescription>
         <CardAction className="flex gap-2">
           {branches && selected && (
             <Select value={selected} onValueChange={onBranchChange}>

@@ -6,7 +6,7 @@ export type RunningDeploy = {
   appId: string
   version: string
   startedAt: string
-  startedBy: string | null // the dashboard user, or the CI tool's user when started there; null when no user did
+  startedBy: string // who started it; the CI tool's name when no user did
   buildId: string
   url: string // the deploy build's page in the CI tool
 }
